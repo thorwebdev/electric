@@ -14,43 +14,37 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
       ) do
     vaxine_transaction_data
     |> build_rows()
-    |> build_transaction(metadata.commit_timestamp, :origin)
+    |> build_transaction_int(metadata.commit_timestamp)
   end
 
   defp build_rows(vaxine_transaction_data) do
     vaxine_transaction_data
     |> Enum.filter(fn {{key, _}, _, _, _} -> String.starts_with?(key, "row") end)
-    |> Enum.map(fn {key, type, value, log_ops} ->
-      processed_log_ops =
-        log_ops
-        |> Enum.flat_map(fn {ops, []} -> ops end)
-        |> Enum.map(fn {{key, type}, op_value} -> handle_log_op(key, type, op_value) end)
-
-      {to_row(convert_value([key], type, value)), processed_log_ops}
+    |> Enum.map(fn {key, type, value, _log_ops} ->
+      to_row(convert_value([key], type, value))
     end)
   end
 
   defp to_row(map) when map_size(map) == 0, do: nil
   defp to_row(map), do: struct(Row, map)
 
-  @spec build_transaction(
-          [{Row.t() | nil, ops :: term()}],
-          commit_timestamp :: DateTime.t(),
-          target :: :origin | :peers
+  @spec build_transaction_int(
+          [Row.t() | nil],
+          commit_timestamp :: DateTime.t()
         ) :: {:ok, Changes.Transaction.t()} | {:error, :invalid_materialized_row}
-  defp build_transaction(entries, commit_timestamp, target) do
+  defp build_transaction_int(entries, commit_timestamp) do
     entries
     |> Enum.reduce_while([], fn
-      {nil, _ops}, _acc ->
+      nil, _acc ->
         Logger.error("empty row (nil)")
         {:halt, {:error, :invalid_materialized_row}}
 
-      {%{id: nil} = row, _ops}, _acc ->
+      %{id: nil} = row, _acc ->
         Logger.error("empty id for row: #{inspect(row)}")
         {:halt, {:error, :invalid_materialized_row}}
 
-      {row, ops}, acc ->
-        {:cont, [to_dml(row, ops, target) | acc]}
+      row, acc ->
+        {:cont, [to_dml(row) | acc]}
     end)
     |> case do
       dml_changes when is_list(dml_changes) ->
@@ -117,15 +111,13 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     length(disable_tokens -- enable_tokens) == 0
   end
 
-  defp to_dml(
-         %Row{table: table, deleted?: deleted?, schema: schema, row: row},
-         _processed_log_ops,
-         _target
-       ) do
+  defp to_dml(%Row{table: table, deleted?: deleted?, schema: schema, row: row}) do
     # if the final state is `deleted?` it means that the record was deleted;
     cond do
       deleted? ->
-        %Changes.DeletedRecord{old_record: to_string_keys(row), relation: {schema, table}}
+        %Changes.DeletedRecord{old_record: to_string_keys(row),
+                               relation: {schema, table}
+                              }
 
       true ->
         %Changes.UpdatedRecord{

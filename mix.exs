@@ -63,10 +63,11 @@ defmodule Electric.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_metrics_prometheus, "~> 1.1.0"},
       {:satellite_proto,
-       git: "https://github.com/electric-sql/typescript-client.git",
+       git: "file:///home/me/Dev/typescript-client",
        runtime: false,
        app: false,
-       ref: "5ad6341c394cc02ec0c79e9e337ae373cc343302",
+       ref: "defnull/vax-531-shadow-rows",
+       # ref: "5ad6341c394cc02ec0c79e9e337ae373cc343302",
        compile: false,
        sparse: "proto"},
       {:yajwt, "~> 1.4"}

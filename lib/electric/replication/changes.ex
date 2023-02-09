@@ -21,6 +21,11 @@ defmodule Electric.Replication.Changes do
   @type db_identifier() :: String.t()
   @type relation() :: {schema :: db_identifier(), table :: db_identifier()}
   @type record() :: %{(column_name :: db_identifier()) => column_data :: binary()}
+
+  # Tag is of the form 'origin@timestamp' where:
+  # origin - is unique source id (UUID for Satellite clients)
+  # timestamp - is an timestamp in UTC in milliseconds
+  @type tag() :: String.t()
   @type change() ::
           Changes.NewRecord.t()
           | Changes.UpdatedRecord.t()
@@ -40,21 +45,25 @@ defmodule Electric.Replication.Changes do
   end
 
   defmodule NewRecord do
-    defstruct [:relation, :record]
+    defstruct [:relation, :record, tags: []]
 
     @type t() :: %__MODULE__{
             relation: Changes.relation(),
-            record: Changes.record()
+            record: Changes.record(),
+            tags: [Changes.tag()]
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-      def handle_change(%{record: record, relation: {schema, table}}) do
+      def handle_change(%{record: record, relation: {schema, table}, tags: tags},
+        %Transaction{} = tx)
+      do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
-
         row =
           schema
-          |> Row.new(table, record, keys)
-          |> Row.force_deleted_update(false)
+          |> Row.new(table, record, keys, tags)
+          |> Ecto.Changeset.change(deleted?: [Changes.generateTag(tx)])
+
+        IO.puts("aaaaa: #{inspect(row)}")
 
         case VaxRepo.insert(row) do
           {:ok, _} -> :ok
@@ -65,38 +74,53 @@ defmodule Electric.Replication.Changes do
   end
 
   defmodule UpdatedRecord do
-    defstruct [:relation, :old_record, :record]
+    defstruct [:relation, :old_record, :record, tags: []]
 
     @type t() :: %__MODULE__{
             relation: Changes.relation(),
             old_record: Changes.record() | nil,
-            record: Changes.record()
+            record: Changes.record(),
+            tags: [Changes.tag()]
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-      def handle_change(%{old_record: old_record, record: new_record, relation: {schema, table}})
-          when old_record == %{} or old_record == nil do
-        %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
-        row = Row.new(schema, table, new_record, keys)
+#      def handle_change(
+#                %{old_record: old_record, record: new_record,
+#                  relation: {schema, table},
+#                  tags: tags
+#                },
+#        %Transaction{}
+#      )
+#          when old_record == %{} or old_record == nil do
+#        %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
+#
+#        row = Row.new(schema, table, new_record, keys)
+#
+#        %Row{row | row: %{}}
+#        |> Ecto.Changeset.change(row: new_record)
+#        |> Row.force_deleted_update([])
+#        |> Electric.VaxRepo.update()
+#        |> case do
+#          {:ok, _} -> :ok
+#          error -> error
+#        end
+#      end
 
-        %Row{row | row: %{}}
-        |> Ecto.Changeset.change(row: new_record)
-        |> Row.force_deleted_update(false)
-        |> Electric.VaxRepo.update()
-        |> case do
-          {:ok, _} -> :ok
-          error -> error
-        end
-      end
-
-      def handle_change(%{old_record: old_record, record: new_record, relation: {schema, table}}) do
+      def handle_change(
+        %{old_record: old_record, record: new_record,
+          relation: {schema, table},
+          tags: tags
+        },
+        %Transaction{} = tx
+      )
+      # when old_record != nil and old_record != %{}
+      do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
         schema
-        |> Row.new(table, old_record, keys)
-        |> Ecto.Changeset.change(row: new_record)
-        |> Row.force_deleted_update(false)
+        |> Row.new(table, old_record, keys, tags)
+        |> Ecto.Changeset.change(row: new_record, deleted?: MapSet.new([Changes.generateTag(tx)]))
         |> Electric.VaxRepo.update()
         |> case do
           {:ok, _} -> :ok
@@ -107,20 +131,24 @@ defmodule Electric.Replication.Changes do
   end
 
   defmodule DeletedRecord do
-    defstruct [:relation, :old_record]
+    defstruct [:relation, :old_record, tags: []]
 
     @type t() :: %__MODULE__{
             relation: Changes.relation(),
-            old_record: Changes.record()
+            old_record: Changes.record(),
+            tags: [Chages.tag()]
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-      def handle_change(%{old_record: old_record, relation: {schema, table}}) do
+      def handle_change(
+        %{old_record: old_record, relation: {schema, table}, tags: tags},
+        %Transaction{}
+      ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
         schema
-        |> Row.new(table, old_record, keys)
-        |> Row.force_deleted_update(true)
+        |> Row.new(table, old_record, keys, tags)
+        |> Ecto.Changeset.change(deleted?: MapSet.new([]))
         |> Electric.VaxRepo.update()
         |> case do
           {:ok, _} -> :ok
@@ -138,4 +166,10 @@ defmodule Electric.Replication.Changes do
   def belongs_to_user?(%Transaction{} = tx, user_id) do
     Changes.Ownership.belongs_to_user?(tx, user_id)
   end
+
+  @spec generateTag(Transaction.t()) :: binary()
+  def generateTag(%Transaction{origin: origin, commit_timestamp: tm}) do
+    origin <>"@" <> Integer.to_string( DateTime.to_unix(tm, :millisecond) )
+  end
+
 end
