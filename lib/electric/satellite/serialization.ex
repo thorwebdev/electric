@@ -193,6 +193,7 @@ defmodule Electric.Satellite.Serialization do
 
         trans = %Transaction{
           origin: origin,
+          origin_type: :satellite,
           changes: [],
           publication: "",
           commit_timestamp: dt,

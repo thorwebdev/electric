@@ -56,7 +56,9 @@ defmodule Electric.Replication.VaxineTest do
 
   def gen_ctx(origin \\ "origin") do
     ct = DateTime.utc_now()
-    %Transaction{commit_timestamp: ct, origin: origin}
+    #%Transaction{commit_timestamp: ct, origin: origin, origin_type: :satellite}
+    %Transaction{commit_timestamp: ct, origin: origin, origin_type: :postgresql}
+
   end
 
   test "ToVaxine new -> update -> delete" do
@@ -86,8 +88,8 @@ defmodule Electric.Replication.VaxineTest do
   end
 
   def gen_update(id) do
-      %{deleted?: tags} = read_row(id)
-
+      #%{deleted?: tags} = read_row(id)
+      tags = []
       change = %{"content" => "a"}
                |> updated_record_change(%{"content" => "b"}, tags, id)
 
@@ -104,6 +106,7 @@ defmodule Electric.Replication.VaxineTest do
 
       assert :ok = ToVaxine.handle_change(change, gen_ctx())
       assert %{deleted?: tags} = read_row(id)
+
   end
 
   describe "Conflict situations" do

@@ -77,7 +77,8 @@ config :electric,
   instance_id: System.get_env("ELECTRIC_INSTANCE_ID", "instance-1.region-1.dev.electric-db"),
   regional_id: System.get_env("ELECTRIC_REGIONAL_ID", "region-1.dev.electric-db")
 
-config :logger, level: :debug
+config :logger, level: :debug,
+  truncate: :infinity
 
 auth_provider =
   with {:ok, auth_key} <- System.fetch_env("SATELLITE_AUTH_SIGNING_KEY"),

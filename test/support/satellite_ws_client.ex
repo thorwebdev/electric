@@ -134,17 +134,20 @@ defmodule Electric.Test.SatelliteWsClient do
     )
   end
 
-  def send_update_data(conn \\ __MODULE__, lsn, commit_time, id, value) do
+  def send_update_data(conn \\ __MODULE__, lsn, commit_time, id, value, old_value) do
     send_tx_data(
       conn,
       lsn,
       commit_time,
       {:update,
-       %SatOpUpdate{relation_id: 11111, old_row_data: nil, row_data: map_to_row([id, value, ""])}}
+       %SatOpUpdate{relation_id: 11111,
+                    old_row_data: map_to_row([id, old_value, ""]),
+                    row_data: map_to_row([id, value, ""])
+                    }}
     )
   end
 
-  def send_update_owned_data(conn \\ __MODULE__, lsn, commit_time, id, user_id, value) do
+  def send_update_owned_data(conn \\ __MODULE__, lsn, commit_time, id, user_id, value, old_value) do
     send_tx_data(
       conn,
       lsn,
@@ -152,7 +155,7 @@ defmodule Electric.Test.SatelliteWsClient do
       {:update,
        %SatOpUpdate{
          relation_id: 22222,
-         old_row_data: nil,
+         old_row_data: map_to_row([id, user_id, old_value]),
          row_data: map_to_row([id, user_id, value])
        }}
     )
@@ -163,7 +166,9 @@ defmodule Electric.Test.SatelliteWsClient do
       conn,
       lsn,
       commit_time,
-      {:delete, %SatOpDelete{relation_id: 11111, old_row_data: map_to_row([id, value, ""])}}
+      {:delete, %SatOpDelete{relation_id: 11111,
+                             old_row_data: map_to_row([id, value, ""])
+                            }}
     )
   end
 
@@ -172,7 +177,9 @@ defmodule Electric.Test.SatelliteWsClient do
       conn,
       lsn,
       commit_time,
-      {:delete, %SatOpDelete{relation_id: 22222, old_row_data: map_to_row([id, user_id, value])}}
+      {:delete, %SatOpDelete{relation_id: 22222,
+                             old_row_data: map_to_row([id, user_id, value])
+                            }}
     )
   end
 

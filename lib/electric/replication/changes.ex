@@ -36,12 +36,13 @@ defmodule Electric.Replication.Changes do
             changes: [Changes.change()],
             commit_timestamp: DateTime.t(),
             origin: String.t(),
+            origin_type: :postgresql | :satellite,
             publication: String.t(),
             lsn: Electric.Postgres.Lsn.t(),
             ack_fn: (() -> :ok | {:error, term()})
           }
 
-    defstruct [:changes, :commit_timestamp, :origin, :publication, :lsn, :ack_fn]
+    defstruct [:changes, :commit_timestamp, :origin, :publication, :lsn, :ack_fn, :origin_type]
   end
 
   defmodule NewRecord do
@@ -61,7 +62,7 @@ defmodule Electric.Replication.Changes do
         row =
           schema
           |> Row.new(table, record, keys, tags)
-          |> Ecto.Changeset.change(deleted?: [Changes.generateTag(tx)])
+          |> Ecto.Changeset.change(deleted?: MapSet.new([Changes.generateTag(tx)]))
 
         case VaxRepo.insert(row) do
           {:ok, _} -> :ok
@@ -82,28 +83,6 @@ defmodule Electric.Replication.Changes do
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-
-#      def handle_change(
-#                %{old_record: old_record, record: new_record,
-#                  relation: {schema, table},
-#                  tags: tags
-#                },
-#        %Transaction{}
-#      )
-#          when old_record == %{} or old_record == nil do
-#        %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
-#
-#        row = Row.new(schema, table, new_record, keys)
-#
-#        %Row{row | row: %{}}
-#        |> Ecto.Changeset.change(row: new_record)
-#        |> Row.force_deleted_update([])
-#        |> Electric.VaxRepo.update()
-#        |> case do
-#          {:ok, _} -> :ok
-#          error -> error
-#        end
-#      end
 
       def handle_change(
         %{old_record: old_record, record: new_record,
@@ -140,9 +119,27 @@ defmodule Electric.Replication.Changes do
     defimpl Electric.Replication.Vaxine.ToVaxine do
       def handle_change(
         %{old_record: old_record, relation: {schema, table}, tags: tags},
-        %Transaction{}
+        %Transaction{origin_type: type}
       ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
+
+        # At the moment we do not support tags in PotgreSQL, so in order to
+        # make sure data is deleted we get the current clear set and provide it
+        # generate remove for all tags in it.
+        #
+        # This is a temporary hack, till we get Satellite-type tag handling in
+        # PostgreSQL
+        tags = case type do
+                 :postgresql ->
+                   %{deleted?: clear_tags} = Electric.VaxRepo.reload(
+                   Row.new(schema, table, %{"id" => Map.get(old_record, "id")}, keys)
+                 )
+                   clear_tags
+                 :satellite ->
+                   tags
+               end
+
+        Logger.info("remove tags: #{inspect(tags)}")
 
         schema
         |> Row.new(table, old_record, keys, tags)

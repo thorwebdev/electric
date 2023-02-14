@@ -24,12 +24,14 @@ config :logger, :console,
     :regional_id,
     :client_id,
     :user_id
-  ]
+  ],
+  truncate: :infinity
 
 config :logger,
   handle_otp_reports: true,
   handle_sasl_reports: true,
-  level: :debug
+  level: :debug,
+  truncate: :infinity
 
 config :electric, Electric.Replication.Postgres,
   pg_client: Electric.Replication.Postgres.Client,
