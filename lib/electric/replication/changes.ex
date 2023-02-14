@@ -63,8 +63,6 @@ defmodule Electric.Replication.Changes do
           |> Row.new(table, record, keys, tags)
           |> Ecto.Changeset.change(deleted?: [Changes.generateTag(tx)])
 
-        IO.puts("aaaaa: #{inspect(row)}")
-
         case VaxRepo.insert(row) do
           {:ok, _} -> :ok
           error -> error
