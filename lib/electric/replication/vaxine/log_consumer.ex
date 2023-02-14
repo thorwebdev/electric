@@ -113,7 +113,7 @@ defmodule Electric.Replication.Vaxine.LogConsumer do
   end
 
   defp handle_event(%Transaction{} = tx, state) do
-    %Transaction{ack_fn: ack_fn, origin: origin, publication: publication} = tx
+    %Transaction{ack_fn: ack_fn, publication: publication} = tx
 
     Logger.debug("New transaction in publication `#{publication}`: #{inspect(tx, pretty: true)}")
 

@@ -113,7 +113,7 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     length(disable_tokens -- enable_tokens) == 0
   end
 
-  defp convert_value(_key, type = :antidote_crdt_set_aw, internal_value) do
+  defp convert_value(_key, :antidote_crdt_set_aw, internal_value) do
     :orddict.fetch_keys(internal_value)
   end
 
