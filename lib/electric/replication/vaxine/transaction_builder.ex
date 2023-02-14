@@ -91,6 +91,8 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     end
   end
 
+  # FIXME: I do not follow why do we return internal representation of the types here
+  # we should be providing just anitodote_crdt:value() here instead
   defp convert_value(keys, :antidote_crdt_map_rr, value) do
     value
     |> :dict.to_list()
@@ -111,18 +113,23 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     length(disable_tokens -- enable_tokens) == 0
   end
 
+  defp convert_value(_key, type = :antidote_crdt_set_aw, internal_value) do
+    :orddict.fetch_keys(internal_value)
+  end
+
   defp to_dml(%Row{table: table, deleted?: deleted?, schema: schema, row: row}) do
     # if the final state is `deleted?` it means that the record was deleted;
-    cond do
-      deleted? ->
+    case deleted? do
+      [] ->
         %Changes.DeletedRecord{old_record: to_string_keys(row),
                                relation: {schema, table}
                               }
 
-      true ->
+      tags ->
         %Changes.UpdatedRecord{
           record: to_string_keys(row),
-          relation: {schema, table}
+          relation: {schema, table},
+          tags: tags
         }
     end
   end
@@ -131,24 +138,4 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     Map.new(map, fn {key, value} -> {Atom.to_string(key), value} end)
   end
 
-  defp handle_log_op(key, :antidote_crdt_register_lww, {:ok, {_ts, value}}) do
-    if is_list(key) do
-      {key, :erlang.binary_to_term(value)}
-    else
-      {key, value}
-    end
-  end
-
-  defp handle_log_op(key, :antidote_crdt_flag_dw, {:ok, {_, _, _}}) do
-    {key, :touched}
-  end
-
-  defp handle_log_op(key, :antidote_crdt_counter_pn, {:ok, _}) do
-    {key, :touched}
-  end
-
-  defp handle_log_op("row", :antidote_crdt_map_rr, {:ok, {[inner_op], []}}) do
-    {{inner_key, inner_type}, inner_op_value} = inner_op
-    handle_log_op(["row", inner_key], inner_type, inner_op_value)
-  end
 end

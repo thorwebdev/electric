@@ -119,7 +119,7 @@ defmodule Electric.Replication.Vaxine.LogConsumer do
 
     res =
       Electric.Retry.retry_while total_timeout: 10000, max_single_backoff: 1000 do
-        case Vaxine.transaction_to_vaxine(tx, publication, origin) do
+        case Vaxine.transaction_to_vaxine(tx, publication) do
           :ok ->
             # FIXME: Persist LSN from PG to Vaxine
             :ok = ack_fn.()

@@ -134,7 +134,7 @@ defmodule Electric.Replication.Changes do
     @type t() :: %__MODULE__{
             relation: Changes.relation(),
             old_record: Changes.record(),
-            tags: [Chages.tag()]
+            tags: [Changes.tag()]
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do

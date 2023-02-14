@@ -11,11 +11,10 @@ defmodule Electric.Replication.Vaxine do
 
   def transaction_to_vaxine(
         %Electric.Replication.Changes.Transaction{} = transaction,
-        publication,
-        origin
+        publication
       ) do
     VaxRepo.transaction(fn ->
-      Metadata.new(transaction.commit_timestamp, publication, origin)
+      Metadata.new(transaction.commit_timestamp, publication, transaction.origin)
       |> VaxRepo.insert()
 
       transaction.changes
