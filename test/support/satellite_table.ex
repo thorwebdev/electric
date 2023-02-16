@@ -112,7 +112,8 @@ defmodule Electric.Test.SatelliteMockedClient do
     {:reply, :ok, state}
   end
 
-  def handle_info(_, state) do
+  def handle_info(msg, state) do
+    Logger.info("#{inspect(msg)}")
     {:noreply, state}
   end
 

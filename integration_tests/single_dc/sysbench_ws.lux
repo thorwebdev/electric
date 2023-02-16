@@ -96,6 +96,7 @@
     ?:ok
     !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243516)
     ?:ok
+    ?+(.*) %{commit_timestamp: 1666371243516, lsn: (.*) tags: \["ws1@1666371243516"\], (.*)
     ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 1>>
 
 [shell electric]
@@ -112,6 +113,7 @@
     ?:ok
     !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243518)
     ?:ok
+    ?+(.*) %{commit_timestamp: 1666371243518, lsn: (.*) tags: \["ws1@1666371243518"\], (.*)
     ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 2>>
 
 [shell electric]
@@ -127,6 +129,7 @@
     ?:ok
     !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243520)
     ?:ok
+    ?+(.*) %{commit_timestamp: 1666371243520, (.*) tags: \[\], (.*)
     ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 3>>
 
 [shell electric]

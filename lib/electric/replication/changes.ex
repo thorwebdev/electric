@@ -124,7 +124,7 @@ defmodule Electric.Replication.Changes do
       ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
-        # At the moment we do not support tags in PotgreSQL, so in order to
+        # FIXME: At the moment we do not support tags in PotgreSQL, so in order to
         # make sure data is deleted we get the current clear set and provide it
         # generate remove for all tags in it.
         #

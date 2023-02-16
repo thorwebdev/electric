@@ -10,7 +10,6 @@ defmodule Electric.Satellite.Serialization do
   }
 
   use Electric.Satellite.Protobuf
-  require Logger
 
   @type relation_mapping() ::
           %{Changes.relation() => {PB.relation_id(), [SchemaRegistry.column_name()]}}
@@ -21,8 +20,6 @@ defmodule Electric.Satellite.Serialization do
   @spec serialize_trans(Transaction.t(), term(), relation_mapping()) ::
           {%SatOpLog{}, [Changes.relation()], relation_mapping()}
   def serialize_trans(%Transaction{} = trans, vx_offset, known_relations) do
-    Logger.info("#{inspect(trans)}")
-    Logger.info("#{inspect(known_relations)}")
     tm =
       trans.commit_timestamp
       |> DateTime.to_unix(:millisecond)
@@ -86,8 +83,6 @@ defmodule Electric.Satellite.Serialization do
   def map_to_row(nil, _), do: nil
 
   def map_to_row(data, rel_cols) when is_list(rel_cols) and is_map(data) do
-    Logger.info("map to row: #{inspect(data)}  #{inspect(rel_cols)}")
-
     bitmask = []
     values = []
 
