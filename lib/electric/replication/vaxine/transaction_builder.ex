@@ -132,7 +132,7 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
     :orddict.fetch_keys(internal_value)
   end
 
-  defp to_dml(%Row{table: table, deleted?: deleted, schema: schema, row: row} = r) do
+  defp to_dml(%Row{table: table, deleted?: deleted, schema: schema, row: row}) do
 
     # "Deteled" is implemented as an OR-set, however setting field to a bottom value
     # in crdt map with "observed_remove" strategy will remove this field from the map.

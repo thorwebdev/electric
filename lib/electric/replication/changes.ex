@@ -36,6 +36,7 @@ defmodule Electric.Replication.Changes do
             changes: [Changes.change()],
             commit_timestamp: DateTime.t(),
             origin: String.t(),
+            # this field is only set by Electric when propagating data down to Vaxine
             origin_type: :postgresql | :satellite,
             publication: String.t(),
             lsn: Electric.Postgres.Lsn.t(),

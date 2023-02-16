@@ -7,8 +7,10 @@
 [include shared.luxinc]
 
 [invoke setup]
-# Starting and stopping Electric is required to properly initialize the database - it's what we expect to have done in production
-# Namely, Electric exectutes `CREATE_REPLICATION_SLOT` before any data gets inserted, and thus we can receive inserted backlog on reconnection.
+# Starting and stopping Electric is required to properly initialize the database
+# - it's what we expect to have done in production Namely, Electric exectutes
+# `CREATE_REPLICATION_SLOT` before any data gets inserted, and thus we can
+# receive inserted backlog on reconnection.
 [invoke stop_electric]
 
 [shell sysbench_pg1]
@@ -43,7 +45,8 @@
     !provider = {Electric.Satellite.Auth.JWT, issuer: "dev.electric-sql.com", \
                   secret_key: "integration-tests-signing-key-example"}
     ?$eprompt
-    !Electric.Test.SatelliteWsClient.connect_and_spawn( \
+    !{ok, pid} = Electric.Test.SatelliteMockedClient.start_replicate_table( \
+            Electric.Test.SatelliteWsClient.gen_schema(), \
             [ \
             {:auth, %{auth_provider: provider, user_id: "5a9a8b1d-263d-4cad-90f8-9190396161d7"}}, \
             {:id, "ws1"}, \
@@ -79,7 +82,7 @@
     !INSERT INTO entries (content) VALUES ('Hello from a');
     ?INSERT 0 1
 
-[config id="1f922fbb-016b-40c3-aeb1-e52682f82241"]
+[global id=1f922fbb-016b-40c3-aeb1-e52682f82241]
 
 [shell ws1]
     [timeout 10]
@@ -88,12 +91,12 @@
     [local middle_lsn=$1]
 
     [invoke log "Send transaction with insert from Satellite"]
-    !Electric.Test.SatelliteWsClient.send_test_relation()
+    !Electric.Test.SatelliteMockedClient.insert( \
+       pid, "$id", %{"id"=> "$id", "content"=> "Hello from Satellite", "content_b"=> ""} )
     ?:ok
-    !Electric.Test.SatelliteWsClient.send_new_data( \
-       "1", 1666371243516, ?$id, "Hello from Satellite")
+    !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243516)
     ?:ok
-    ?%(.*)SatPingResp\{[^\}]*lsn: "1"
+    ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 1>>
 
 [shell electric]
     ?Hello from Satellite
@@ -104,10 +107,12 @@
 
 [shell ws1]
     [invoke log "Send transaction with update from Satellite"]
-    !Electric.Test.SatelliteWsClient.send_update_data( \
-        "2", 1666371243518, ?$id, "How are you?", "Hello from Satellite")
+    !Electric.Test.SatelliteMockedClient.update( \
+       pid, "$id", %{"id"=> "$id", "content"=> "How are you?", "content_b"=> ""} )
     ?:ok
-    ?%(.*)SatPingResp\{[^\}]*lsn: "2"
+    !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243518)
+    ?:ok
+    ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 2>>
 
 [shell electric]
     ?How are you?
@@ -118,10 +123,11 @@
 
 [shell ws1]
     [invoke log "Send transaction with delete from Satellite"]
-    !Electric.Test.SatelliteWsClient.send_delete_data( \
-        "3", 1666371243520, ?$id, "How are you?")
+    !Electric.Test.SatelliteMockedClient.delete(pid, "$id")
     ?:ok
-    ?%(.*)SatPingResp\{[^\}]*lsn: "3"
+    !Electric.Test.SatelliteMockedClient.push_changes(pid, 1666371243520)
+    ?:ok
+    ?%(.*)SatPingResp\{[^\}]*lsn: <<131, 97, 3>>
 
 [shell electric]
     ?How are you?
