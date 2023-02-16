@@ -543,7 +543,7 @@ defmodule Electric.Test.SatelliteWsClient do
           acc
 
         %SatTransOp{op: {key, op}}, acc ->
-          acc1 = Map.update(acc, key, 0, fn n -> n + 1 end)
+          acc1 = Map.update(acc, key, 1, fn n -> n + 1 end)
           Map.update(acc1, :tags, op.tags, fn tags -> op.tags ++ tags end)
       end
     )
