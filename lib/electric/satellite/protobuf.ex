@@ -1,5 +1,4 @@
 defmodule Electric.Satellite.Protobuf do
-
   # This is a version provided in the corresponding protocol buffer file
   # Make sure to bump it here and in the using macro below.
 

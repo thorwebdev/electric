@@ -56,10 +56,12 @@ defmodule Electric.Replication.Changes do
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-      def handle_change(%{record: record, relation: {schema, table}, tags: tags},
-        %Transaction{} = tx)
-      do
+      def handle_change(
+            %{record: record, relation: {schema, table}, tags: tags},
+            %Transaction{} = tx
+          ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
+
         row =
           schema
           |> Row.new(table, record, keys, tags)
@@ -84,16 +86,11 @@ defmodule Electric.Replication.Changes do
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-
-      def handle_change(
-        %{old_record: old_record, record: new_record,
-          relation: {schema, table},
-          tags: tags
-        },
-        %Transaction{} = tx
-      )
       # when old_record != nil and old_record != %{}
-      do
+      def handle_change(
+            %{old_record: old_record, record: new_record, relation: {schema, table}, tags: tags},
+            %Transaction{} = tx
+          ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
         schema
@@ -119,9 +116,9 @@ defmodule Electric.Replication.Changes do
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
       def handle_change(
-        %{old_record: old_record, relation: {schema, table}, tags: tags},
-        %Transaction{origin_type: type}
-      ) do
+            %{old_record: old_record, relation: {schema, table}, tags: tags},
+            %Transaction{origin_type: type}
+          ) do
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
         # FIXME: At the moment we do not support tags in PotgreSQL, so in order to
@@ -130,17 +127,19 @@ defmodule Electric.Replication.Changes do
         #
         # This is a temporary hack, till we get Satellite-type tag handling in
         # PostgreSQL
-        tags = case type do
-                 :postgresql ->
-                   %{deleted?: clear_tags} = Electric.VaxRepo.reload(
-                   Row.new(schema, table, %{"id" => Map.get(old_record, "id")}, keys)
-                 )
-                   clear_tags
-                 :satellite ->
-                   tags
-               end
+        tags =
+          case type do
+            :postgresql ->
+              %{deleted?: clear_tags} =
+                Electric.VaxRepo.reload(
+                  Row.new(schema, table, %{"id" => Map.get(old_record, "id")}, keys)
+                )
 
-        Logger.info("remove tags: #{inspect(tags)}")
+              clear_tags
+
+            :satellite ->
+              tags
+          end
 
         schema
         |> Row.new(table, old_record, keys, tags)
@@ -165,7 +164,6 @@ defmodule Electric.Replication.Changes do
 
   @spec generateTag(Transaction.t()) :: binary()
   def generateTag(%Transaction{origin: origin, commit_timestamp: tm}) do
-    origin <>"@" <> Integer.to_string( DateTime.to_unix(tm, :millisecond) )
+    origin <> "@" <> Integer.to_string(DateTime.to_unix(tm, :millisecond))
   end
-
 end

@@ -1,7 +1,6 @@
 defmodule Electric.Test.SatelliteMockedClient do
-
   alias Electric.Test.SatelliteWsClient
-  alias Electric.Replication.Changes.{ Transaction, NewRecord, DeletedRecord, UpdatedRecord }
+  alias Electric.Replication.Changes.{Transaction, NewRecord, DeletedRecord, UpdatedRecord}
 
   use GenServer
   require Logger
@@ -42,41 +41,42 @@ defmodule Electric.Test.SatelliteMockedClient do
 
   defmodule State do
     @type t() :: %__MODULE__{
-      oplog_table: :ets.tid(),
-      shadow_table: :ets.tid(),
-      user_table: :ets.tid(),
-      last_oplog_pos: non_neg_integer(),
-      last_sent_pos: non_neg_integer(),
-      origin: String.t(),
-      relation_id: SchemaRegistry.oid(),
-      relations_mapping: %{},
-      conn: pid()
-    }
+            oplog_table: :ets.tid(),
+            shadow_table: :ets.tid(),
+            user_table: :ets.tid(),
+            last_oplog_pos: non_neg_integer(),
+            last_sent_pos: non_neg_integer(),
+            origin: String.t(),
+            relation_id: SchemaRegistry.oid(),
+            relations_mapping: %{},
+            conn: pid()
+          }
     defstruct oplog_table: nil,
-      shadow_table: nil,
-      user_table: nil,
-      last_oplog_pos: 0,
-      last_sent_pos: 0,
-      origin: nil,
-      relation_id: nil,
-      relations_mapping: nil,
-      conn: :origin
+              shadow_table: nil,
+              user_table: nil,
+              last_oplog_pos: 0,
+              last_sent_pos: 0,
+              origin: nil,
+              relation_id: nil,
+              relations_mapping: nil,
+              conn: :origin
   end
 
-  def init({ %{schema_name: schema, table_name: table,
-             oid: oid, columns: columns}, opts}) do
+  def init({%{schema_name: schema, table_name: table, oid: oid, columns: columns}, opts}) do
     {:ok, conn} = SatelliteWsClient.connect_and_spawn(opts)
     SatelliteWsClient.send_relation_internal(conn, schema, table, oid, columns)
 
-    {:ok, %State{
-        oplog_table:  :ets.new(:oplog, [:ordered_set, :public]),
-        shadow_table: :ets.new(:shadow, [:set, :public]),
-        user_table:   :ets.new(:user_t, [:set, :public]),
-        relation_id: {schema, table},
-        relations_mapping: %{ {schema, table} =>
-          {oid, Enum.map(columns, fn %{name: name} -> name end)  } },
-        origin: Keyword.get(opts, :id),
-        conn: conn
+    {:ok,
+     %State{
+       oplog_table: :ets.new(:oplog, [:ordered_set, :public]),
+       shadow_table: :ets.new(:shadow, [:set, :public]),
+       user_table: :ets.new(:user_t, [:set, :public]),
+       relation_id: {schema, table},
+       relations_mapping: %{
+         {schema, table} => {oid, Enum.map(columns, fn %{name: name} -> name end)}
+       },
+       origin: Keyword.get(opts, :id),
+       conn: conn
      }}
   end
 
@@ -84,6 +84,7 @@ defmodule Electric.Test.SatelliteMockedClient do
     case insert_row(id, data, strict, state) do
       {:error, _} = error ->
         {:reply, error, state}
+
       {:ok, state} ->
         {:reply, :ok, state}
     end
@@ -93,6 +94,7 @@ defmodule Electric.Test.SatelliteMockedClient do
     case update_row(id, data, strict, state) do
       {:error, _} = error ->
         {:reply, error, state}
+
       {:ok, state} ->
         {:reply, :ok, state}
     end
@@ -102,6 +104,7 @@ defmodule Electric.Test.SatelliteMockedClient do
     case delete_row(id, strict, state) do
       {:error, _} = error ->
         {:reply, error, state}
+
       {:ok, state} ->
         {:reply, :ok, state}
     end
@@ -117,103 +120,125 @@ defmodule Electric.Test.SatelliteMockedClient do
     {:noreply, state}
   end
 
-  defp insert_row(id, data, :true, state) do
+  defp insert_row(id, data, true, state) do
     case :ets.insert_new(state.user_table, {id, data}) do
-      :false ->
+      false ->
         {:error, :already_present}
-      :true ->
-        :true = insert_oplog(state.last_oplog_pos + 1, :insert, id, data, nil,
-          state
-        )
-        :true = :ets.insert_new(state.shadow_table, {id, []})
-        {:ok, %State{ state | last_oplog_pos: state.last_oplog_pos + 1}}
+
+      true ->
+        true = insert_oplog(state.last_oplog_pos + 1, :insert, id, data, nil, state)
+        true = :ets.insert_new(state.shadow_table, {id, []})
+        {:ok, %State{state | last_oplog_pos: state.last_oplog_pos + 1}}
     end
   end
 
-  defp insert_row(id, data, :false, state) do
-    update_row(id, data, :false, state)
+  defp insert_row(id, data, false, state) do
+    update_row(id, data, false, state)
   end
 
   defp update_row(id, new_data, strict, state) do
     case :ets.lookup(state.user_table, id) do
       [] when strict == true ->
         {:error, :do_not_exist}
+
       [] when strict == false ->
-        insert_row(id, new_data, :true, state)
+        insert_row(id, new_data, true, state)
+
       [{_, old_data}] ->
-        :true = :ets.update_element(state.user_table, id, {2, new_data})
-        :false = :ets.insert_new(state.shadow_table, {id, []})
-        :true = insert_oplog(state.last_oplog_pos + 1, :update, id, new_data, old_data,
-          state
-        )
-        {:ok, %State{ state | last_oplog_pos: state.last_oplog_pos + 1}}
+        true = :ets.update_element(state.user_table, id, {2, new_data})
+        false = :ets.insert_new(state.shadow_table, {id, []})
+        true = insert_oplog(state.last_oplog_pos + 1, :update, id, new_data, old_data, state)
+        {:ok, %State{state | last_oplog_pos: state.last_oplog_pos + 1}}
     end
   end
 
-  defp delete_row(id, _strict = :true, state) do
+  defp delete_row(id, _strict = true, state) do
     case :ets.lookup(state.user_table, id) do
       [] ->
         {:error, :do_not_exist}
+
       [{^id, data}] ->
         :ets.insert_new(state.shadow_table, {id, []})
-        :true = insert_oplog(state.last_oplog_pos + 1, :delete, id, nil, data,
-          state
-        )
-        {:ok, %State{ state | last_oplog_pos: state.last_oplog_pos + 1}}
+        true = insert_oplog(state.last_oplog_pos + 1, :delete, id, nil, data, state)
+        {:ok, %State{state | last_oplog_pos: state.last_oplog_pos + 1}}
     end
   end
 
   @spec push_transaction(integer(), State.t()) :: {:ok, State.t()}
   defp push_transaction(commit_timestamp, %State{} = state) do
     changes =
-      :ets.foldl(fn {pos, dml, id, new_row, old_row}, acc ->
-        case (pos > state.last_sent_pos) do
-          true ->
-            [{dml, id, new_row, old_row} | acc]
-            clear_tags = fetch_shadow(id, state)
+      :ets.foldl(
+        fn {pos, dml, id, new_row, old_row}, acc ->
+          case pos > state.last_sent_pos do
+            true ->
+              [{dml, id, new_row, old_row} | acc]
+              clear_tags = fetch_shadow(id, state)
 
-            cond do
-              dml == :delete ->
-                update_shadow(id, [], state)
-                [%DeletedRecord{relation: state.relation_id,
-                                old_record: old_row,
-                                tags: clear_tags
-                               } | acc]
-              dml == :insert ->
-                update_shadow(id, [generateTag(commit_timestamp, state)], state)
-                [%NewRecord{relation: state.relation_id,
-                            record: new_row,
-                            tags: clear_tags
-                           } | acc]
-              dml == :update ->
-                update_shadow(id, [generateTag(commit_timestamp, state)], state)
-                [ %UpdatedRecord{ relation: state.relation_id,
-                                  old_record: old_row,
-                                  record: new_row,
-                                  tags: clear_tags
-                                } | acc]
-            end
-          false ->
-            acc
-        end
-      end, [], state.oplog_table)
+              cond do
+                dml == :delete ->
+                  update_shadow(id, [], state)
+
+                  [
+                    %DeletedRecord{
+                      relation: state.relation_id,
+                      old_record: old_row,
+                      tags: clear_tags
+                    }
+                    | acc
+                  ]
+
+                dml == :insert ->
+                  update_shadow(id, [generateTag(commit_timestamp, state)], state)
+
+                  [
+                    %NewRecord{relation: state.relation_id, record: new_row, tags: clear_tags}
+                    | acc
+                  ]
+
+                dml == :update ->
+                  update_shadow(id, [generateTag(commit_timestamp, state)], state)
+
+                  [
+                    %UpdatedRecord{
+                      relation: state.relation_id,
+                      old_record: old_row,
+                      record: new_row,
+                      tags: clear_tags
+                    }
+                    | acc
+                  ]
+              end
+
+            false ->
+              acc
+          end
+        end,
+        [],
+        state.oplog_table
+      )
 
     {:ok, datetime} = DateTime.from_unix(commit_timestamp, :millisecond)
+
     SatelliteWsClient.send_tx_internal(
       state.conn,
-      %Transaction{ changes: changes,
-                    commit_timestamp: datetime,
-                    origin: state.origin,
-                    lsn: state.last_oplog_pos
-      }, state.last_oplog_pos, state.relations_mapping )
+      %Transaction{
+        changes: changes,
+        commit_timestamp: datetime,
+        origin: state.origin,
+        lsn: state.last_oplog_pos
+      },
+      state.last_oplog_pos,
+      state.relations_mapping
+    )
 
-    {:ok, %State{state | last_sent_pos: state.last_oplog_pos }}
+    {:ok, %State{state | last_sent_pos: state.last_oplog_pos}}
   end
 
   defp insert_oplog(pos, dml, id, new_data, old_data, state) do
-    :ets.insert_new(state.oplog_table,
-          {pos, dml, id, new_data, old_data}
-        )
+    :ets.insert_new(
+      state.oplog_table,
+      {pos, dml, id, new_data, old_data}
+    )
   end
 
   defp fetch_shadow(id, state) do
@@ -228,5 +253,4 @@ defmodule Electric.Test.SatelliteMockedClient do
   defp generateTag(commit_timestamp, state) do
     state.origin <> "@" <> Integer.to_string(commit_timestamp)
   end
-
 end

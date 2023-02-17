@@ -56,9 +56,8 @@ defmodule Electric.Replication.VaxineTest do
 
   def gen_ctx(origin \\ "origin") do
     ct = DateTime.utc_now()
-    #%Transaction{commit_timestamp: ct, origin: origin, origin_type: :satellite}
+    # %Transaction{commit_timestamp: ct, origin: origin, origin_type: :satellite}
     %Transaction{commit_timestamp: ct, origin: origin, origin_type: :postgresql}
-
   end
 
   test "ToVaxine new -> update -> delete" do
@@ -78,42 +77,51 @@ defmodule Electric.Replication.VaxineTest do
   end
 
   def gen_new(id) do
-      change = %{"content" => "a"}
-               |> new_record_change(id)
-      tx = gen_ctx()
-      assert :ok = ToVaxine.handle_change(change, tx)
+    change =
+      %{"content" => "a"}
+      |> new_record_change(id)
 
-      tags = Changes.generateTag(tx)
-      assert %{row: %{"content" => "a"}, deleted?: tags} = read_row(id)
+    tx = gen_ctx()
+    assert :ok = ToVaxine.handle_change(change, tx)
+
+    tags = Changes.generateTag(tx)
+    assert %{row: %{"content" => "a"}, deleted?: tags} = read_row(id)
   end
 
   def gen_update(id) do
-      #%{deleted?: tags} = read_row(id)
-      tags = []
-      change = %{"content" => "a"}
-               |> updated_record_change(%{"content" => "b"}, tags, id)
+    # %{deleted?: tags} = read_row(id)
+    tags = []
 
-      assert :ok = ToVaxine.handle_change(change, gen_ctx())
-      assert %{row: %{"content" => "b"}} = read_row(id)
+    change =
+      %{"content" => "a"}
+      |> updated_record_change(%{"content" => "b"}, tags, id)
+
+    assert :ok = ToVaxine.handle_change(change, gen_ctx())
+    assert %{row: %{"content" => "b"}} = read_row(id)
   end
 
   def gen_delete(id) do
-      %{deleted?: tags} = read_row(id)
+    %{deleted?: tags} = read_row(id)
 
-      change = %{"content" => "a"}
-               |> deleted_record_change(tags, id )
-      tags = MapSet.new([])
+    change =
+      %{"content" => "a"}
+      |> deleted_record_change(tags, id)
 
-      assert :ok = ToVaxine.handle_change(change, gen_ctx())
-      assert %{deleted?: tags} = read_row(id)
+    tags = MapSet.new([])
 
+    assert :ok = ToVaxine.handle_change(change, gen_ctx())
+    assert %{deleted?: tags} = read_row(id)
   end
 
   describe "Conflict situations" do
     test "rows are merged for new record" do
       id = Ecto.UUID.generate()
       ctx1 = gen_ctx()
-      ctx2 = %Transaction{ ctx1 | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second) }
+
+      ctx2 = %Transaction{
+        ctx1
+        | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second)
+      }
 
       concurrent_transactions(
         fn ->
@@ -135,7 +143,11 @@ defmodule Electric.Replication.VaxineTest do
     test "rows are merged for updated record" do
       id = Ecto.UUID.generate()
       ctx1 = gen_ctx()
-      ctx2 = %Transaction{ ctx1 | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second) }
+
+      ctx2 = %Transaction{
+        ctx1
+        | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second)
+      }
 
       gen_new(id)
       %{deleted?: tags} = read_row(id)
@@ -160,7 +172,11 @@ defmodule Electric.Replication.VaxineTest do
     test "update > delete" do
       id = Ecto.UUID.generate()
       ctx1 = gen_ctx()
-      ctx2 = %Transaction{ ctx1 | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second) }
+
+      ctx2 = %Transaction{
+        ctx1
+        | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second)
+      }
 
       gen_new(id)
       %{deleted?: tags} = read_row(id)
@@ -185,7 +201,11 @@ defmodule Electric.Replication.VaxineTest do
     test "insert > delete" do
       id = Ecto.UUID.generate()
       ctx1 = gen_ctx()
-      ctx2 = %Transaction{ ctx1 | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second) }
+
+      ctx2 = %Transaction{
+        ctx1
+        | commit_timestamp: DateTime.add(ctx1.commit_timestamp, 1, :second)
+      }
 
       gen_new(id)
       gen_delete(id)

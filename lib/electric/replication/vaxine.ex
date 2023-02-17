@@ -4,8 +4,8 @@ defmodule Electric.Replication.Vaxine do
   alias Electric.Replication.Changes.Transaction
 
   defprotocol ToVaxine do
-    @spec handle_change(change :: term(), %Transaction{})
-    :: :ok | {:error, reason :: term()}
+    @spec handle_change(change :: term(), %Transaction{}) ::
+            :ok | {:error, reason :: term()}
     def handle_change(change, transaction)
   end
 

@@ -58,11 +58,20 @@ defmodule Electric.Satellite.Serialization do
   end
 
   defp mk_trans_op(%NewRecord{record: data, tags: tags}, rel_id, rel_cols) do
-    op_insert = %SatOpInsert{relation_id: rel_id, row_data: map_to_row(data, rel_cols), tags: tags}
+    op_insert = %SatOpInsert{
+      relation_id: rel_id,
+      row_data: map_to_row(data, rel_cols),
+      tags: tags
+    }
+
     %SatTransOp{op: {:insert, op_insert}}
   end
 
-  defp mk_trans_op(%UpdatedRecord{record: data, old_record: old_data, tags: tags}, rel_id, rel_cols) do
+  defp mk_trans_op(
+         %UpdatedRecord{record: data, old_record: old_data, tags: tags},
+         rel_id,
+         rel_cols
+       ) do
     op_update = %SatOpUpdate{
       relation_id: rel_id,
       row_data: map_to_row(data, rel_cols),
@@ -74,8 +83,12 @@ defmodule Electric.Satellite.Serialization do
   end
 
   defp mk_trans_op(%DeletedRecord{old_record: data, tags: tags}, rel_id, rel_cols) do
-    op_delete = %SatOpDelete{relation_id: rel_id, old_row_data: map_to_row(data, rel_cols),
-                             tags: tags}
+    op_delete = %SatOpDelete{
+      relation_id: rel_id,
+      old_row_data: map_to_row(data, rel_cols),
+      tags: tags
+    }
+
     %SatTransOp{op: {:delete, op_delete}}
   end
 
@@ -214,9 +227,7 @@ defmodule Electric.Satellite.Serialization do
           case op do
             %SatOpInsert{row_data: row_data, tags: tags} ->
               data = row_to_map(relation.columns, row_data, false)
-              %NewRecord{relation: {relation.schema, relation.table},
-                         record: data, tags: tags
-              }
+              %NewRecord{relation: {relation.schema, relation.table}, record: data, tags: tags}
 
             %SatOpUpdate{row_data: row_data, old_row_data: old_row_data, tags: tags} ->
               old_data = row_to_map(relation.columns, old_row_data, true)
@@ -231,9 +242,11 @@ defmodule Electric.Satellite.Serialization do
 
             %SatOpDelete{old_row_data: old_row_data, tags: tags} ->
               old_data = row_to_map(relation.columns, old_row_data, true)
-              %DeletedRecord{relation: {relation.schema, relation.table},
-                             old_record: old_data,
-                             tags: tags
+
+              %DeletedRecord{
+                relation: {relation.schema, relation.table},
+                old_record: old_data,
+                tags: tags
               }
           end
 

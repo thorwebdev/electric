@@ -12,9 +12,6 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
         {:vx_wal_txn, _txid, _dc_id, _wal_position, vaxine_transaction_data},
         metadata
       ) do
-
-    Logger.info("transaction data: #{inspect(vaxine_transaction_data)}")
-
     vaxine_transaction_data
     |> build_rows()
     |> build_transaction_int(metadata.commit_timestamp)
@@ -22,16 +19,8 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
 
   defp build_rows(vaxine_transaction_data) do
     vaxine_transaction_data
-    |> Enum.map(fn row ->
-      Logger.info("\n\nrow: #{inspect(row)} \n\nelem1: #{inspect(elem(row, 2))}\n\nelem2: #{inspect(:dict.fetch_keys(elem(row, 2)))}\n\n")
-
-      #Logger.info("keys: #{inspect(keys)}")
-
-      row end)
     |> Enum.filter(fn {{key, _}, _, _, _} -> String.starts_with?(key, "row") end)
     |> Enum.map(fn {key, type, value, _log_ops} ->
-      #Logger.info("row: \n#{inspect(key)} \n#{inspect(type)} \n#{inspect(value)}\n\n")
-
       to_row(convert_value([key], type, value))
     end)
   end
@@ -55,7 +44,7 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
         {:halt, {:error, :invalid_materialized_row}}
 
       row, acc ->
-                {:cont, [to_dml(row) | acc]}
+        {:cont, [to_dml(row) | acc]}
     end)
     |> case do
       dml_changes when is_list(dml_changes) ->
@@ -105,12 +94,9 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
   # FIXME: I do not follow why do we return internal representation of the types here
   # we should be providing just anitodote_crdt:value() here instead
   defp convert_value(keys, :antidote_crdt_map_rr, value) do
-    #Logger.info("keys: #{inspect(keys)}")
-
     value
     |> :dict.to_list()
     |> Map.new(fn {{sub_key, type}, value} ->
-      #Logger.info("subkey: \n#{inspect(sub_key)} \n#{inspect(type)} \n#{inspect(value)}\n\n")
       {String.to_atom(sub_key), convert_value([sub_key | keys], type, value)}
     end)
   end
@@ -128,22 +114,18 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
   end
 
   defp convert_value(_key, :antidote_crdt_set_aw, internal_value) do
-    # Logger.info("set: #{inspect(internal_value)}")
     :orddict.fetch_keys(internal_value)
   end
 
   defp to_dml(%Row{table: table, deleted?: deleted, schema: schema, row: row}) do
-
     # "Deteled" is implemented as an OR-set, however setting field to a bottom value
     # in crdt map with "observed_remove" strategy will remove this field from the map.
     # So we only expect nil when the value was deleted, and `[]` is mostly likely
     # and indication that a row was created.
 
-    case (deleted == []) or (deleted == nil) do
-      true  ->
-        %Changes.DeletedRecord{old_record: to_string_keys(row),
-                               relation: {schema, table}
-                              }
+    case deleted == [] or deleted == nil do
+      true ->
+        %Changes.DeletedRecord{old_record: to_string_keys(row), relation: {schema, table}}
 
       false ->
         %Changes.UpdatedRecord{
@@ -157,5 +139,4 @@ defmodule Electric.Replication.Vaxine.TransactionBuilder do
   defp to_string_keys(map) do
     Map.new(map, fn {key, value} -> {Atom.to_string(key), value} end)
   end
-
 end

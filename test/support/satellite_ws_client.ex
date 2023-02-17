@@ -3,7 +3,7 @@ defmodule Electric.Test.SatelliteWsClient do
 
   """
   alias Electric.Satellite.Serialization
-  alias Electric.Replication.Changes.{ Transaction }
+  alias Electric.Replication.Changes.{Transaction}
 
   use Electric.Satellite.Protobuf
 
@@ -85,26 +85,28 @@ defmodule Electric.Test.SatelliteWsClient do
   end
 
   def gen_schema() do
-    %{schema_name: "public",
+    %{
+      schema_name: "public",
       table_name: "entries",
       oid: 11111,
       columns: [
-       %{name: "id", type: :uuid},
-       %{name: "content", type: :varchar},
-       %{name: "content_b", type: :varchar}
-     ]
+        %{name: "id", type: :uuid},
+        %{name: "content", type: :varchar},
+        %{name: "content_b", type: :varchar}
+      ]
     }
   end
 
   def gen_owned_schema() do
-    %{ schema_name: "public",
-       table_name: "entries",
-       oid: 22222,
-       columns: [
-         %{name: "id", type: :uuid},
-         %{name: "electric_user_id", type: :varchar},
-         %{name: "content", type: :varchar},
-       ]
+    %{
+      schema_name: "public",
+      table_name: "entries",
+      oid: 22222,
+      columns: [
+        %{name: "id", type: :uuid},
+        %{name: "electric_user_id", type: :varchar},
+        %{name: "content", type: :varchar}
+      ]
     }
   end
 
@@ -166,10 +168,11 @@ defmodule Electric.Test.SatelliteWsClient do
       lsn,
       commit_time,
       {:update,
-       %SatOpUpdate{relation_id: 11111,
-                    old_row_data: map_to_row([id, old_value, ""]),
-                    row_data: map_to_row([id, value, ""])
-                    }}
+       %SatOpUpdate{
+         relation_id: 11111,
+         old_row_data: map_to_row([id, old_value, ""]),
+         row_data: map_to_row([id, value, ""])
+       }}
     )
   end
 
@@ -192,9 +195,7 @@ defmodule Electric.Test.SatelliteWsClient do
       conn,
       lsn,
       commit_time,
-      {:delete, %SatOpDelete{relation_id: 11111,
-                             old_row_data: map_to_row([id, value, ""])
-                            }}
+      {:delete, %SatOpDelete{relation_id: 11111, old_row_data: map_to_row([id, value, ""])}}
     )
   end
 
@@ -203,9 +204,7 @@ defmodule Electric.Test.SatelliteWsClient do
       conn,
       lsn,
       commit_time,
-      {:delete, %SatOpDelete{relation_id: 22222,
-                             old_row_data: map_to_row([id, user_id, value])
-                            }}
+      {:delete, %SatOpDelete{relation_id: 22222, old_row_data: map_to_row([id, user_id, value])}}
     )
   end
 
@@ -230,8 +229,7 @@ defmodule Electric.Test.SatelliteWsClient do
   Serialize transaction that is represented in internal Electric format
   """
   def send_tx_internal(conn, %Transaction{} = tx, lsn, relations) do
-    {sat_oplog, [], _} =
-      Serialization.serialize_trans(tx, lsn, relations)
+    {sat_oplog, [], _} = Serialization.serialize_trans(tx, lsn, relations)
     send_data(conn, sat_oplog)
   end
 
