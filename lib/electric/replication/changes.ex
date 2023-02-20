@@ -23,9 +23,10 @@ defmodule Electric.Replication.Changes do
   @type record() :: %{(column_name :: db_identifier()) => column_data :: binary()}
 
   # Tag is of the form 'origin@timestamp' where:
-  # origin - is unique source id (UUID for Satellite clients)
+  # origin - is a unique source id (UUID for Satellite clients)
   # timestamp - is an timestamp in UTC in milliseconds
   @type tag() :: String.t()
+
   @type change() ::
           Changes.NewRecord.t()
           | Changes.UpdatedRecord.t()
@@ -86,11 +87,12 @@ defmodule Electric.Replication.Changes do
           }
 
     defimpl Electric.Replication.Vaxine.ToVaxine do
-      # when old_record != nil and old_record != %{}
       def handle_change(
             %{old_record: old_record, record: new_record, relation: {schema, table}, tags: tags},
             %Transaction{} = tx
-          ) do
+          )
+      when old_record != nil and old_record != %{} do
+
         %{primary_keys: keys} = SchemaRegistry.fetch_table_info!({schema, table})
 
         schema
@@ -102,7 +104,7 @@ defmodule Electric.Replication.Changes do
           error -> error
         end
       end
-    end
+     end
   end
 
   defmodule DeletedRecord do

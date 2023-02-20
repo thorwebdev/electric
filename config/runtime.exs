@@ -8,9 +8,7 @@
 import Config
 
 if config_env() == :prod do
-  config :logger,
-    level: String.to_existing_atom(System.get_env("LOG_LEVEL", "info")),
-    truncate: :infinity
+  config :logger, level: String.to_existing_atom(System.get_env("LOG_LEVEL", "info"))
 
   config :electric, Electric.StatusPlug,
     port: System.get_env("STATUS_PORT", "5050") |> String.to_integer()
