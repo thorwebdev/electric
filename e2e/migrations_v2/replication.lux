@@ -1,0 +1,16 @@
+[doc test flow of migrations from pg -> electric -> replication stream]
+
+[global psql=electric]
+
+[include shared.luxinc]
+[invoke setup]
+
+[shell pg_1]
+    [invoke log "run migration on postgres"]
+    !BEGIN;
+    # need to invoke the migration id function
+    !CREATE TABLE mtable1 (id uuid PRIMARY KEY);
+    !COMMIT;
+
+[cleanup]
+    [invoke teardown]
