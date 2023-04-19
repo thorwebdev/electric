@@ -1,11 +1,4 @@
 defmodule Electric.Postgres.Schema.Proto do
-  use Protox,
-    files: [
-      "../../proto/postgres_schema.proto"
-    ],
-    namespace: Electric.Postgres.Schema.Proto,
-    keep_unknown_fields: false
-
   def range_var([relname]) do
     %__MODULE__.RangeVar{name: relname}
   end
@@ -338,7 +331,8 @@ defimpl Catalog, for: Proto.Constraint.ForeignKey do
   end
 
   def depends_on_constraint?(fk, table_name, columns) do
-    Schema.equal?(fk.pk_table, table_name) && Enum.sort(columns) == Enum.sort(fk.pk_cols)
+    Schema.equal?(fk.pk_table, table_name) &&
+      Enum.sort(columns) == Enum.sort(fk.pk_cols)
   end
 
   # keys is only relevant to constraints
