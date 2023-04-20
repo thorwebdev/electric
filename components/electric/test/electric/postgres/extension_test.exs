@@ -1,6 +1,33 @@
 defmodule Electric.Postgres.ExtensionTest do
   use ExUnit.Case, async: false
 
+  defmodule MigrationCreateThing do
+    @behaviour Electric.Postgres.Extension.Migration
+
+    @impl true
+    def version(), do: 2023_03_28_10_57_30
+
+    @impl true
+    def up(schema) do
+      [
+        "CREATE TABLE #{schema}.things (id uuid PRIMARY KEY)"
+      ]
+    end
+
+    @impl true
+    def down(schema) do
+      [
+        "DROP TABLE #{schema}.things CASCADE"
+      ]
+    end
+  end
+
+  def migrations do
+    [
+      MigrationCreateThing
+    ]
+  end
+
   alias Electric.Postgres.{Extension, Schema}
 
   setup do
@@ -30,29 +57,10 @@ defmodule Electric.Postgres.ExtensionTest do
     end
   end
 
-  def migrate(conn, cxt, migrations) do
-    dir = cxt.tmp_dir
+  def migrate(conn, cxt, migration_module) do
+    {:ok, _} = Extension.migrate(conn, migration_module)
 
-    versions =
-      Enum.reduce(migrations, [], fn {version, name, sql}, acc ->
-        filename = "#{version}_#{Macro.underscore(name)}.exs"
-        filepath = Path.join(dir, filename)
-
-        ex = """
-        defmodule Electric.Postgres.ExtensionTest.#{name} do
-          def up(schema) do
-            ["#{sql}"]
-          end
-        end
-        """
-
-        File.write!(filepath, ex)
-        [version | acc]
-      end)
-      |> Enum.reverse()
-
-    {:ok, _} = Extension.migrate(conn, dir)
-
+    versions = Enum.map(migration_module.migrations(), & &1.version())
     assert {:ok, columns, rows} = :epgsql.squery(conn, "SELECT * FROM electric.schema_migrations")
 
     assert ["version", "inserted_at"] == Enum.map(columns, &elem(&1, 1))
@@ -68,22 +76,42 @@ defmodule Electric.Postgres.ExtensionTest do
     {:ok, Enum.map(rows, &Tuple.to_list(&1))}
   end
 
-  @migrations [
-    {2023_03_28_10_57_30, "CreateThing", "CREATE TABLE \#{schema}.things (id uuid PRIMARY KEY)"},
-    {2023_03_28_10_57_31, "CreateOtherThing",
-     "CREATE TABLE \#{schema}.other_things (id uuid PRIMARY KEY)"},
-    {2023_03_28_10_57_32, "DropOtherThing", "DROP TABLE \#{schema}.other_things"}
-  ]
+  defmodule Migration01 do
+    def version(), do: 2023_03_28_10_57_30
+    def up(schema), do: ["CREATE TABLE #{schema}.things (id uuid PRIMARY KEY)"]
+  end
+
+  defmodule Migration02 do
+    def version(), do: 2023_03_28_10_57_31
+    def up(schema), do: ["CREATE TABLE #{schema}.other_things (id uuid PRIMARY KEY)"]
+  end
+
+  defmodule Migration03 do
+    def version(), do: 2023_03_28_10_57_32
+    def up(schema), do: ["DROP TABLE #{schema}.other_things"]
+  end
+
+  defmodule MigrationsV1 do
+    def migrations, do: [Migration01]
+  end
+
+  defmodule MigrationsV2 do
+    def migrations, do: [Migration01, Migration02]
+  end
+
+  defmodule MigrationsV3 do
+    def migrations, do: [Migration01, Migration02, Migration03]
+  end
 
   @tag :tmp_dir
   test "uses migration table to track applied migrations", cxt do
     tx(
       fn conn ->
-        {:ok, rows} = migrate(conn, cxt, Enum.slice(@migrations, 0..0))
+        {:ok, rows} = migrate(conn, cxt, MigrationsV1)
         assert rows == [["schema_migrations"], ["things"]]
-        {:ok, rows} = migrate(conn, cxt, Enum.slice(@migrations, 0..1))
+        {:ok, rows} = migrate(conn, cxt, MigrationsV2)
         assert rows == [["schema_migrations"], ["things"], ["other_things"]]
-        {:ok, rows} = migrate(conn, cxt, Enum.slice(@migrations, 0..2))
+        {:ok, rows} = migrate(conn, cxt, MigrationsV3)
         assert rows == [["schema_migrations"], ["things"]]
       end,
       cxt

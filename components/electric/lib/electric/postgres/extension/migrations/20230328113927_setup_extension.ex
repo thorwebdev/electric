@@ -1,6 +1,12 @@
-defmodule Electric.Postgres.Extension.Migrations.SetupExtension do
+defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
   alias Electric.Postgres.Extension
 
+  @behaviour Extension.Migration
+
+  @impl true
+  def version, do: 2023_03_28_11_39_27
+
+  @impl true
   def up(schema) do
     ddl_table = "#{schema}.#{Extension.ddl_table()}"
     schema_table = "#{schema}.#{Extension.schema_table()}"
@@ -142,5 +148,10 @@ defmodule Electric.Postgres.Extension.Migrations.SetupExtension do
 
       """
     ]
+  end
+
+  @impl true
+  def down(_schema) do
+    []
   end
 end

@@ -18,7 +18,6 @@ defmodule Electric.Postgres.Extension do
   @ddl_table "ddl_commands"
   @schema_table "schema"
 
-  @default_migration_path Path.expand("extension/migrations", __DIR__)
   @current_schema_query "SELECT schema, version FROM #{@schema}.#{@schema_table} ORDER BY id DESC LIMIT 1"
   @save_schema_query "INSERT INTO #{@schema}.#{@schema_table} (version, schema) VALUES ($1, $2)"
   @ddl_history_query "SELECT id, txid, txts, query FROM #{@schema}.#{@ddl_table} ORDER BY id ASC;"
@@ -49,11 +48,25 @@ defmodule Electric.Postgres.Extension do
     end
   end
 
-  @spec migrate(conn(), Path.t()) :: {:ok, versions()} | {:error, term()}
-  def migrate(conn, path \\ @default_migration_path) do
-    migrations = migrations(path)
+  @spec migrations() :: [module(), ...]
+  def migrations do
+    alias Electric.Postgres.Extension.Migrations
 
-    if Enum.empty?(migrations), do: raise(Error, message: "no migration files in #{path}")
+    [
+      Migrations.Migration_20230328113927
+    ]
+  end
+
+  @spec migrate(conn()) :: {:ok, versions()} | {:error, term()}
+  def migrate(conn) do
+    migrate(conn, __MODULE__)
+  end
+
+  @spec migrate(conn(), module()) :: {:ok, versions()} | {:error, term()}
+  def migrate(conn, module) do
+    migrations = migration_versions(module)
+
+    if Enum.empty?(migrations), do: raise(Error, message: "no migrations defined in #{module}")
 
     ensure_transaction(conn, fn txconn ->
       create_schema(txconn)
@@ -64,15 +77,18 @@ defmodule Electric.Postgres.Extension do
 
         versions =
           migrations
-          |> Enum.reject(fn {version, _, _path} -> version in existing_migrations end)
-          |> Enum.flat_map(fn {version, name, path} ->
-            Enum.map(compile_file(path), &{version, name, path, &1})
-          end)
-          |> Enum.reduce([], fn {version, _name, _path, module}, v ->
+          |> Enum.reject(fn {version, _module} -> version in existing_migrations end)
+          |> Enum.reduce([], fn {version, module}, v ->
             for sql <- module.up(@schema) do
               {:ok, _cols, _rows} = :epgsql.squery(txconn, sql)
             end
 
+            # {:ok, _count} =
+            #   :epgsql.equery(
+            #     txconn,
+            #     "INSERT INTO #{@migration_table} (version) VALUES ($1)",
+            #     [version]
+            #   )
             {:ok, _count} =
               :epgsql.squery(
                 txconn,
@@ -86,12 +102,6 @@ defmodule Electric.Postgres.Extension do
         {:ok, versions}
       end)
     end)
-  end
-
-  defp compile_file(path) do
-    path
-    |> Code.compile_file()
-    |> Enum.map(&elem(&1, 0))
   end
 
   # https://dba.stackexchange.com/a/311714
@@ -142,30 +152,13 @@ defmodule Electric.Postgres.Extension do
     end
   end
 
-  def migrations(dir) when is_binary(dir) do
-    dir
-    |> migration_files()
-    |> split_paths()
-  end
+  def migration_versions(module) when is_atom(module) do
+    unless function_exported?(module, :migrations, 0),
+      do: raise(ArgumentError, message: "Module #{module} does not have a migrations/0 function")
 
-  def migration_files(dir) when is_binary(dir) do
-    Path.wildcard(Path.join(dir, "*.exs"))
-  end
-
-  defp split_paths(paths) when is_list(paths) do
-    paths
-    |> Enum.map(&extract_migration_info/1)
-    |> Enum.filter(& &1)
-    |> Enum.sort_by(&elem(&1, 0))
-  end
-
-  defp extract_migration_info(file) do
-    base = Path.basename(file)
-
-    case Integer.parse(Path.rootname(base)) do
-      {integer, "_" <> name} -> {integer, name, file}
-      _ -> nil
-    end
+    module
+    |> apply(:migrations, [])
+    |> Enum.map(&{&1.version(), &1})
   end
 
   def ddl_history(conn) do
