@@ -11,6 +11,9 @@
 [shell pg_1]
     [invoke start_psql pg_1]
 
+[shell pg_2]
+    [invoke start_psql pg_2]
+
 [shell vaxine]
     !make start_vaxine_1
     -$fail_pattern

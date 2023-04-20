@@ -22,11 +22,13 @@ services:
       VAXINE_HOST: vaxine_1
       ELECTRIC_HOST: electric_1
       CONNECTORS: >-
-        pg_1=postgresql://postgres:password@pg_1:5432/electric;
+        postgres_1=postgresql://postgres:password@pg_1:5432/electric;
+        postgres_2=postgresql://postgres:password@pg_2:5432/electric;
       ELECTRIC_INSTANCE_ID: instance-a.region-1.test.electric-db
       ELECTRIC_REGIONAL_ID: region-1.test.electric-db
     depends_on:
       - pg_1
+      - pg_2
       - vaxine_1
 
   pg_1:
@@ -42,3 +44,8 @@ services:
       service: postgresql
     ports:
       - "54322:5432"
+
+  elixir_client_1:
+    extends:
+      file: ../services_templates.yaml
+      service: elixir_client
