@@ -74,10 +74,9 @@ defmodule Electric.Postgres.Extension do
             end
 
             {:ok, _count} =
-              :epgsql.equery(
+              :epgsql.squery(
                 txconn,
-                "INSERT INTO #{@migration_table} (version) VALUES ($1)",
-                [version]
+                "INSERT INTO #{@migration_table} (version) VALUES ('#{version}')"
               )
 
             [version | v]
@@ -109,7 +108,7 @@ defmodule Electric.Postgres.Extension do
   end
 
   def create_schema(conn) do
-    ddl(conn, "CREATE SCHEMA IF NOT EXISTS #{@schema}", [])
+    ddl(conn, "CREATE SCHEMA IF NOT EXISTS #{@schema}")
   end
 
   @create_migration_table_sql """
@@ -120,7 +119,7 @@ defmodule Electric.Postgres.Extension do
   """
 
   def create_migration_table(conn) do
-    ddl(conn, @create_migration_table_sql, [])
+    ddl(conn, @create_migration_table_sql)
   end
 
   defp with_migration_lock(conn, fun) do
@@ -130,13 +129,13 @@ defmodule Electric.Postgres.Extension do
 
   defp existing_migrations(conn) do
     {:ok, _cols, rows} =
-      :epgsql.equery(conn, "SELECT version FROM #{@migration_table} ORDER BY version ASC", [])
+      :epgsql.squery(conn, "SELECT version FROM #{@migration_table} ORDER BY version ASC")
 
-    Enum.map(rows, fn {version} -> version end)
+    Enum.map(rows, fn {version} -> String.to_integer(version) end)
   end
 
-  defp ddl(conn, sql, bind \\ []) do
-    case :epgsql.equery(conn, sql, bind) do
+  defp ddl(conn, sql, _bind \\ []) do
+    case :epgsql.squery(conn, sql) do
       {:ok, _count} -> conn
       {:ok, _count, _cols, _rows} -> conn
       {:ok, _cols, _rows} -> conn
