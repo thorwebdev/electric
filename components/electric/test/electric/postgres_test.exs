@@ -135,6 +135,11 @@ defmodule Electric.PostgresTest do
     config = Keyword.delete(config, :database)
     db_name = "electric_postgres_test_#{DateTime.utc_now() |> DateTime.to_unix()}"
 
+    # put the configured password into the env where the pg cli tools expects it to be
+    # if we're already getting the password from the env, then this does nothing
+    if password = Keyword.get(config, :password),
+      do: System.put_env("PGPASSWORD", to_string(password))
+
     {_, 0} =
       cmd(
         "createdb",
