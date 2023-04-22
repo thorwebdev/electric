@@ -82,14 +82,16 @@ defmodule Electric.Satellite.Serialization do
             do:
               raise(RuntimeError, message: "Got DDL transaction with differing migration versions")
 
-          {:ok, schema, op} = Replication.migrate(schema, v, sql)
+          {ops, schema} =
+            case Replication.migrate(schema, v, sql) do
+              {:ok, schema, op} ->
+                {[%SatTransOp{op: {:migrate, op}} | ops], schema}
 
-          %{
-            state
-            | ops: [%SatTransOp{op: {:migrate, op}} | ops],
-              migration_version: v,
-              schema: schema
-          }
+              {:ok, schema} ->
+                {ops, schema}
+            end
+
+          %{state | ops: ops, migration_version: v, schema: schema}
 
         _ ->
           state

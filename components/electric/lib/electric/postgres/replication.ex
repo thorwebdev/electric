@@ -16,14 +16,20 @@ defmodule Electric.Postgres.Replication do
   #
   # - creation of indexes doesn't affect any tables so that list should be empty
   @spec migrate(Schema.t(), version(), binary(), Electric.Postgres.Dialect.t()) ::
-          {:ok, Schema.t(), Protocol.SatOpMigrate.t()}
+          {:ok, Schema.t(), Protocol.SatOpMigrate.t()} | {:ok, Schema.t()}
   def migrate(schema, version, stmt, dialect \\ @default_dialect) do
     ast = Electric.Postgres.parse!(stmt)
     schema = Schema.update(schema, ast)
 
-    msg = build_replication_msg(ast, version, schema, dialect)
+    case propagatable_stmt?(ast) do
+      [] ->
+        {:ok, schema}
 
-    {:ok, schema, msg}
+      propagate_ast ->
+        msg = build_replication_msg(propagate_ast, version, schema, dialect)
+
+        {:ok, schema, msg}
+    end
   end
 
   def stmt_type(%Pg.CreateStmt{}) do
@@ -59,6 +65,10 @@ defmodule Electric.Postgres.Replication do
     []
   end
 
+  defp get_affected_table(_stmt) do
+    []
+  end
+
   defp build_replication_msg(ast, version, schema, dialect) do
     tables =
       ast
@@ -86,6 +96,27 @@ defmodule Electric.Postgres.Replication do
       table: table,
       stmts: stmts
     }
+  end
+
+  # FIXME: not all ddl commands are suitable for passing to the clients.
+  # these should be filtered by the event trigger function. in lieu of that
+  # filter them here
+  defp propagatable_stmt?(ast) do
+    Enum.filter(ast, fn
+      %Pg.CreateStmt{} ->
+        true
+
+      %Pg.IndexStmt{} ->
+        true
+
+      %Pg.AlterTableStmt{
+        cmds: [%{node: {:alter_table_cmd, %Pg.AlterTableCmd{subtype: :AT_AddColumn}}}]
+      } ->
+        true
+
+      _else ->
+        false
+    end)
   end
 
   defp replication_msg_table(%Proto.Table{} = table, dialect) do

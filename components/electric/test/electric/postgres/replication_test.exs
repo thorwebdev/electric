@@ -85,6 +85,27 @@ defmodule Electric.Postgres.ReplicationTest do
       |> Replication.affected_tables()
       |> assert_table_list([])
     end
+
+    test "returns [] for unsupported stmts" do
+      stmts = [
+        """
+        CREATE SUBSCRIPTION \"postgres_2\" CONNECTION 'host=electric_1 port=5433 dbname=test connect_timeout=5000' PUBLICATION \"all_tables\" WITH (connect = false)
+        """,
+        """
+        ALTER SUBSCRIPTION \"postgres_1\" ENABLE
+        """,
+        """
+        ALTER SUBSCRIPTION \"postgres_1\" REFRESH PUBLICATION WITH (copy_data = false)
+        """
+      ]
+
+      for stmt <- stmts do
+        stmt
+        |> parse()
+        |> Replication.affected_tables()
+        |> assert_table_list([])
+      end
+    end
   end
 
   describe "migrate/2" do
@@ -252,6 +273,27 @@ defmodule Electric.Postgres.ReplicationTest do
              ]
 
       assert is_nil(table)
+    end
+
+    test "pg-only ddl statements don't generate a message" do
+      stmts = [
+        """
+        CREATE SUBSCRIPTION \"postgres_2\" CONNECTION 'host=electric_1 port=5433 dbname=test connect_timeout=5000' PUBLICATION \"all_tables\" WITH (connect = false)
+        """,
+        """
+        ALTER SUBSCRIPTION \"postgres_1\" ENABLE
+        """,
+        """
+        ALTER SUBSCRIPTION \"postgres_1\" REFRESH PUBLICATION WITH (copy_data = false)
+        """
+      ]
+
+      schema = Schema.new()
+      version = "20230405134615"
+
+      for stmt <- stmts do
+        assert {:ok, _schema} = Replication.migrate(schema, version, stmt)
+      end
     end
 
     # TODO: actually I think this is a situation we *MUST* avoid by
