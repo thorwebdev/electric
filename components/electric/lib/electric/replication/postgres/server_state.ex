@@ -23,11 +23,6 @@ defmodule Electric.Replication.Postgres.ServerState do
     Electric.name(__MODULE__, origin)
   end
 
-  def name(args) do
-    dbg(args)
-    raise "wtf"
-  end
-
   def start_link({conn_config, opts}) do
     start_link(conn_config, opts)
   end
@@ -48,7 +43,7 @@ defmodule Electric.Replication.Postgres.ServerState do
         schema
 
       error ->
-        raise RuntimeException, message: "Unable to load schema: #{inspect(error)}"
+        raise RuntimeError, message: "Unable to load schema: #{inspect(error)}"
     end
   end
 
