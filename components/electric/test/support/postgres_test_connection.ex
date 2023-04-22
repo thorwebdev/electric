@@ -4,7 +4,7 @@ defmodule Electric.Postgres.TestConnection do
       host: System.get_env("PG_HOST", "localhost"),
       port: System.get_env("PG_PORT", "54321"),
       database: System.get_env("PG_DB", "electric"),
-      username: System.get_env("PG_USERNAME", "postgres"),
+      username: System.get_env("PG_USERNAME", "electric"),
       password: System.get_env("PGPASSWORD", "password")
     ]
     |> Keyword.update!(:port, &String.to_integer/1)
