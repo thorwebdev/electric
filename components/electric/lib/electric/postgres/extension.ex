@@ -42,6 +42,8 @@ defmodule Electric.Postgres.Extension do
   defguard is_ddl_relation(relation)
            when elem(relation, 0) == @schema and elem(relation, 1) == @ddl_relation
 
+  defguard is_extension_relation(relation) when elem(relation, 0) == @schema
+
   def extract_ddl_version(%{"txid" => _, "txts" => _, "version" => version, "query" => query}) do
     {:ok, version, query}
   end

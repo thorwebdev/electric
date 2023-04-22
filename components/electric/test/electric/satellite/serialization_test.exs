@@ -335,4 +335,72 @@ defmodule Electric.Satellite.SerializationTest do
              %SatTransOp{op: {:commit, %SatOpCommit{}}}
            ] = ops
   end
+
+  test "writes to tables in electric schema are not serialized" do
+    origin = "postgres_1"
+    version = "20220421"
+
+    tx = %Transaction{
+      changes: [
+        %Electric.Replication.Changes.UpdatedRecord{
+          relation: {"electric", "schema"},
+          old_record: nil,
+          record: %{
+            "id" => "6",
+            "txid" => "749",
+            "txts" => "2023-04-20 19:41:56.236357+00",
+            "version" => version
+          },
+          tags: ["postgres_1@1682019749178"]
+        },
+        %Electric.Replication.Changes.UpdatedRecord{
+          relation: {"electric", "something"},
+          old_record: nil,
+          record: %{
+            "id" => "7",
+            "query" => "ALTER SUBSCRIPTION \"postgres_1\" ENABLE",
+            "txid" => "749",
+            "txts" => "2023-04-20 19:41:56.236357+00",
+            "version" => version
+          },
+          tags: ["postgres_1@1682019749178"]
+        },
+        %Electric.Replication.Changes.UpdatedRecord{
+          relation: {"electric", "schema_migrations"},
+          old_record: nil,
+          record: %{
+            "id" => "8",
+            "query" =>
+              "ALTER SUBSCRIPTION \"postgres_1\" REFRESH PUBLICATION WITH (copy_data = false)",
+            "txid" => "749",
+            "txts" => "2023-04-20 19:41:56.236357+00",
+            "version" => version
+          },
+          tags: ["postgres_1@1682019749178"]
+        }
+      ],
+      commit_timestamp: ~U[2023-04-20 14:05:31.416063Z],
+      origin: origin,
+      publication: "all_tables",
+      lsn: %Lsn{segment: 0, offset: 0},
+      origin_type: :postgresql
+    }
+
+    {:ok, _pid} =
+      start_supervised(
+        {Electric.Replication.Postgres.ServerState,
+         {[origin: origin], [backend: {StateList, parent: self()}]}}
+      )
+
+    assert_receive {StateList, {:connect, [origin: ^origin]}}
+
+    {oplog, [], %{}} = Serialization.serialize_trans(tx, 1, %{})
+
+    assert %SatOpLog{ops: ops} = oplog
+
+    assert [
+             %SatTransOp{op: {:begin, %SatOpBegin{is_migration: false}}},
+             %SatTransOp{op: {:commit, %SatOpCommit{}}}
+           ] = ops
+  end
 end

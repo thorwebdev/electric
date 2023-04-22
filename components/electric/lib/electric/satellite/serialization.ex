@@ -12,7 +12,8 @@ defmodule Electric.Satellite.Serialization do
 
   use Electric.Satellite.Protobuf
 
-  import Electric.Postgres.Extension, only: [is_migration_relation: 1, is_ddl_relation: 1]
+  import Electric.Postgres.Extension,
+    only: [is_migration_relation: 1, is_ddl_relation: 1, is_extension_relation: 1]
 
   require Logger
 
@@ -98,6 +99,11 @@ defmodule Electric.Satellite.Serialization do
       end
 
     %{state | tx_begin: %{tx_begin | is_migration: true}}
+  end
+
+  # writes to any table under the electric.* schema shoudn't be passed as DML
+  defp serialize_change(record, state) when is_extension_relation(record.relation) do
+    state
   end
 
   defp serialize_change(record, state) do
