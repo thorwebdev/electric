@@ -24,22 +24,15 @@ defmodule Electric.Satellite.Serialization do
   Serialize from internal format to Satellite PB format
   """
   @spec serialize_trans(Transaction.t(), term(), relation_mapping()) ::
-          {%SatOpLog{}, [Changes.relation()], relation_mapping()}
+          {[%SatOpLog{}], [Changes.relation()], relation_mapping()}
   def serialize_trans(%Transaction{} = trans, vx_offset, known_relations) do
     tm = DateTime.to_unix(trans.commit_timestamp, :millisecond)
     lsn = :erlang.term_to_binary(vx_offset)
 
-    tx_begin = %SatOpBegin{
-      commit_timestamp: tm,
-      lsn: lsn,
-      origin: trans.origin,
-      is_migration: false
-    }
-
     state = %{
       ops: [],
       origin: trans.origin,
-      tx_begin: tx_begin,
+      is_migration: false,
       migration_version: nil,
       schema: nil,
       new_relations: [],
@@ -50,14 +43,31 @@ defmodule Electric.Satellite.Serialization do
 
     :ok = maybe_save_schema(trans.origin, state.migration_version, state.schema)
 
-    begin_op = %SatTransOp{op: {:begin, state.tx_begin}}
-    commit_op = %SatTransOp{op: {:commit, %SatOpCommit{commit_timestamp: tm, lsn: lsn}}}
+    case state.ops do
+      [] ->
+        {
+          [],
+          state.new_relations,
+          state.known_relations
+        }
 
-    {
-      %SatOpLog{ops: [begin_op | Enum.reverse([commit_op | state.ops])]},
-      state.new_relations,
-      state.known_relations
-    }
+      [_ | _] = ops ->
+        tx_begin = %SatOpBegin{
+          commit_timestamp: tm,
+          lsn: lsn,
+          origin: trans.origin,
+          is_migration: state.is_migration
+        }
+
+        begin_op = %SatTransOp{op: {:begin, tx_begin}}
+        commit_op = %SatTransOp{op: {:commit, %SatOpCommit{commit_timestamp: tm, lsn: lsn}}}
+
+        {
+          [%SatOpLog{ops: [begin_op | Enum.reverse([commit_op | ops])]}],
+          state.new_relations,
+          state.known_relations
+        }
+    end
   end
 
   defp serialize_change(record, state) when is_migration_relation(record.relation) do
@@ -65,8 +75,7 @@ defmodule Electric.Satellite.Serialization do
       origin: origin,
       ops: ops,
       schema: schema,
-      migration_version: version,
-      tx_begin: tx_begin
+      migration_version: version
     } = state
 
     # lazily load the schema
@@ -98,7 +107,7 @@ defmodule Electric.Satellite.Serialization do
           state
       end
 
-    %{state | tx_begin: %{tx_begin | is_migration: true}}
+    %{state | is_migration: true}
   end
 
   # writes to any table under the electric.* schema shoudn't be passed as DML

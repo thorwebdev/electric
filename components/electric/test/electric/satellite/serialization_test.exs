@@ -196,7 +196,7 @@ defmodule Electric.Satellite.SerializationTest do
       # only receive 1 save instruction
       refute_receive {StateList, {:save, _, _schema}}
 
-      assert %SatOpLog{ops: ops} = oplog
+      assert [%SatOpLog{ops: ops}] = oplog
 
       assert [
                %SatTransOp{op: {:begin, %SatOpBegin{is_migration: true}}},
@@ -328,12 +328,7 @@ defmodule Electric.Satellite.SerializationTest do
 
     {oplog, [], %{}} = Serialization.serialize_trans(tx, 1, %{})
 
-    assert %SatOpLog{ops: ops} = oplog
-
-    assert [
-             %SatTransOp{op: {:begin, %SatOpBegin{is_migration: true}}},
-             %SatTransOp{op: {:commit, %SatOpCommit{}}}
-           ] = ops
+    assert [] == oplog
   end
 
   test "writes to tables in electric schema are not serialized" do
@@ -396,11 +391,6 @@ defmodule Electric.Satellite.SerializationTest do
 
     {oplog, [], %{}} = Serialization.serialize_trans(tx, 1, %{})
 
-    assert %SatOpLog{ops: ops} = oplog
-
-    assert [
-             %SatTransOp{op: {:begin, %SatOpBegin{is_migration: false}}},
-             %SatTransOp{op: {:commit, %SatOpCommit{}}}
-           ] = ops
+    assert [] = oplog
   end
 end
