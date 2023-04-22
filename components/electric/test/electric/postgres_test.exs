@@ -180,11 +180,11 @@ defmodule Electric.PostgresTest do
         ]
       )
 
-    {ddl_table_oid, _} =
-      Enum.find(rows, fn {_oid, name} -> name == Electric.Postgres.Extension.ddl_table() end)
-
     # FIXME: have turned off the capture of ddl statements through logical replication
     # pending a re-write using `Electric.Replication.Postgres.LogicalReplicationProducer`
+    # {ddl_table_oid, _} =
+    #   Enum.find(rows, fn {_oid, name} -> name == Electric.Postgres.Extension.ddl_table() end)
+
     # {:ok, producer} = start_supervised(Producer)
 
     # {:ok, replication_pid} =
