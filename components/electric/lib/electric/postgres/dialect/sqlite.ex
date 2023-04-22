@@ -10,7 +10,7 @@ defmodule Electric.Postgres.Dialect.SQLite do
   alias PgQuery, as: Pg
 
   alias Electric.Postgres
-  alias Electric.Postgres.{Schema, Schema.Proto}
+  alias Electric.Postgres.{Dialect, Schema, Schema.Proto}
 
   alias Electric.Postgres.Schema.Proto.{
     Constraint,
@@ -131,7 +131,7 @@ defmodule Electric.Postgres.Dialect.SQLite do
     )
   end
 
-  @type sql() :: Electric.Postgres.Dialect.sql()
+  @type sql() :: Dialect.sql()
   @typep stmt() :: [binary() | sql() | nil]
 
   @spec stmt(stmt()) :: sql()
@@ -188,7 +188,7 @@ defmodule Electric.Postgres.Dialect.SQLite do
     ~s("#{name}")
   end
 
-  @spec unquoted_name(term()) :: sql()
+  @spec unquoted_name(Dialect.name()) :: sql()
   defp unquoted_name(%Proto.RangeVar{name: name}) do
     unquoted_name(name)
   end
@@ -201,7 +201,6 @@ defmodule Electric.Postgres.Dialect.SQLite do
     name
   end
 
-  @spec map_column(Proto.Column.t(), :create_table | :add_column) :: sql()
   defp map_column(%Proto.Column{} = col, mode) do
     stmt([
       quote_name(col.name),
@@ -210,7 +209,6 @@ defmodule Electric.Postgres.Dialect.SQLite do
     ])
   end
 
-  @spec map_constraint(Constraint.t(), :create_table | :add_column) :: sql()
   defp map_constraint(%Constraint{constraint: {_, %Constraint.NotNull{}}}, _mode) do
     "NOT NULL"
   end
@@ -329,7 +327,7 @@ defmodule Electric.Postgres.Dialect.SQLite do
 
   # map all array types to json -- which requires mapping of the logical replication
   # representation to json
-  @spec map_type(Proto.Column.Type.t()) :: binary()
+  @spec map_type(Dialect.column_type()) :: binary()
 
   def map_type(%Pg.TypeName{} = type) do
     type
@@ -388,7 +386,7 @@ defmodule Electric.Postgres.Dialect.SQLite do
   defp sized(s),
     do: IO.iodata_to_binary(["(", s |> Enum.map(&to_string/1) |> Enum.intersperse(", "), ")"])
 
-  @spec expression(Proto.Expression.t() | nil) :: sql() | nil
+  @spec expression(%Proto.Expression{} | nil) :: sql() | nil
   defp expression(nil) do
     nil
   end

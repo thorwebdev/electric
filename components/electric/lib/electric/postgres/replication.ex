@@ -16,7 +16,7 @@ defmodule Electric.Postgres.Replication do
   #
   # - creation of indexes doesn't affect any tables so that list should be empty
   @spec migrate(Schema.t(), version(), binary(), Electric.Postgres.Dialect.t()) ::
-          {:ok, Schema.t(), Protocol.SatOpMigrate.t()} | {:ok, Schema.t()}
+          {:ok, Schema.t(), %SatOpMigrate{}} | {:ok, Schema.t()}
   def migrate(schema, version, stmt, dialect \\ @default_dialect) do
     ast = Electric.Postgres.parse!(stmt)
     schema = Schema.update(schema, ast)
