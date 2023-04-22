@@ -1,5 +1,5 @@
 defmodule Electric.Satellite.Serialization do
-  alias Electric.Postgres.{Extension, Replication, Schema, SchemaRegistry}
+  alias Electric.Postgres.{Extension, Replication, SchemaRegistry}
   alias Electric.Replication.Changes
   alias Electric.Replication.Postgres.ServerState
 

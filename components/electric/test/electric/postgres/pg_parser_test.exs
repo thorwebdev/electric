@@ -5,7 +5,7 @@ defmodule Electric.Postgres.PgParserTest do
   alias Electric.Postgres.SQLGenerator
 
   test "parser accepts all the inputs" do
-    check all sql <- SQLGenerator.sql_stream(use_schema: false) do
+    check all(sql <- SQLGenerator.sql_stream(use_schema: false)) do
       PgQuery.parse!(sql)
     end
   end

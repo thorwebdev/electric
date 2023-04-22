@@ -547,23 +547,25 @@ defmodule Electric.Postgres.Dialect.SqliteTest do
   property "generated sql", cxt do
     {:ok, pid} = SQLGenerator.SchemaAgent.start_link()
 
-    check all sql <-
-                SQLGenerator.sql_stream(
-                  [:create_table, :create_index],
-                  schema: pid,
-                  create_table: [
-                    temporary_tables: false,
-                    serial: false,
-                    exclude_types: [:bit]
-                  ],
-                  alter_table: [
-                    except: [:drop_not_null, :generated, :set_type, :alter_constraint]
-                  ],
-                  create_index: [
-                    named: :always,
-                    only_supported: true
-                  ]
-                ) do
+    check all(
+            sql <-
+              SQLGenerator.sql_stream(
+                [:create_table, :create_index],
+                schema: pid,
+                create_table: [
+                  temporary_tables: false,
+                  serial: false,
+                  exclude_types: [:bit]
+                ],
+                alter_table: [
+                  except: [:drop_not_null, :generated, :set_type, :alter_constraint]
+                ],
+                create_index: [
+                  named: :always,
+                  only_supported: true
+                ]
+              )
+          ) do
       # IO.puts("> " <> sql)
       to_sqlite(sql, cxt, validate: true)
     end
