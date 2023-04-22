@@ -103,7 +103,9 @@ defmodule Electric.Replication.Postgres.ServerState.Epgsql do
 
   @impl true
   def load(conn) do
-    Extension.current_schema(conn)
+    with {:ok, _version, schema} <- Extension.current_schema(conn) do
+      {:ok, schema}
+    end
   end
 
   @impl true
