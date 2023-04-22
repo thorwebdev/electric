@@ -57,7 +57,7 @@ defmodule Electric.Postgres.ExtensionTest do
     end
   end
 
-  def migrate(conn, cxt, migration_module) do
+  def migrate(conn, _cxt, migration_module) do
     {:ok, _} = Extension.migrate(conn, migration_module)
 
     versions = Enum.map(migration_module.migrations(), & &1.version())
@@ -69,7 +69,7 @@ defmodule Electric.Postgres.ExtensionTest do
     {:ok, _, rows} =
       :epgsql.equery(
         conn,
-        "SELECT c.relname FROM pg_class c INNER JOIN pg_namespace n ON c.relnamespace = n.oid WHERE c.relkind = 'r' AND n.nspname = $1",
+        "SELECT c.relname FROM pg_class c INNER JOIN pg_namespace n ON c.relnamespace = n.oid WHERE c.relkind = 'r' AND n.nspname = $1 ORDER BY c.relname",
         ["electric"]
       )
 
@@ -108,11 +108,12 @@ defmodule Electric.Postgres.ExtensionTest do
     tx(
       fn conn ->
         {:ok, rows} = migrate(conn, cxt, MigrationsV1)
-        assert rows == [["schema_migrations"], ["things"]]
+        # FIXME: we no longer need the electric.migrations table 
+        assert rows == [["migrations"], ["schema_migrations"], ["things"]]
         {:ok, rows} = migrate(conn, cxt, MigrationsV2)
-        assert rows == [["schema_migrations"], ["things"], ["other_things"]]
+        assert rows == [["migrations"], ["other_things"], ["schema_migrations"], ["things"]]
         {:ok, rows} = migrate(conn, cxt, MigrationsV3)
-        assert rows == [["schema_migrations"], ["things"]]
+        assert rows == [["migrations"], ["schema_migrations"], ["things"]]
       end,
       cxt
     )
