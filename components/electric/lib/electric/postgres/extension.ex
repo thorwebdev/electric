@@ -14,17 +14,39 @@ defmodule Electric.Postgres.Extension do
   end
 
   @schema "electric"
-  @migration_table ~s("#{@schema}"."schema_migrations")
-  @ddl_table "ddl_commands"
-  @schema_table "schema"
 
-  @current_schema_query "SELECT schema, version FROM #{@schema}.#{@schema_table} ORDER BY id DESC LIMIT 1"
-  @save_schema_query "INSERT INTO #{@schema}.#{@schema_table} (version, schema) VALUES ($1, $2)"
-  @ddl_history_query "SELECT id, txid, txts, query FROM #{@schema}.#{@ddl_table} ORDER BY id ASC;"
+  @version_relation "migration_versions"
+  @ddl_relation "ddl_commands"
+
+  @migration_table ~s("#{@schema}"."schema_migrations")
+  @version_table ~s("#{@schema}"."#{@version_relation}")
+  @ddl_table ~s("#{@schema}"."#{@ddl_relation}")
+  @schema_table ~s("#{@schema}"."schema")
+
+  @current_schema_query "SELECT schema, version FROM #{@schema_table} ORDER BY id DESC LIMIT 1"
+  @save_schema_query "INSERT INTO #{@schema_table} (version, schema) VALUES ($1, $2)"
+  @ddl_history_query "SELECT id, txid, txts, query FROM #{@ddl_table} ORDER BY id ASC;"
 
   def schema, do: @schema
   def ddl_table, do: @ddl_table
   def schema_table, do: @schema_table
+  def version_table, do: @version_table
+
+  def ddl_relation, do: {@schema, @ddl_relation}
+  def version_relation, do: {@schema, @version_relation}
+
+  defguard is_migration_relation(relation)
+           when elem(relation, 0) == @schema and
+                  elem(relation, 1) in [@version_relation, @ddl_relation]
+
+  defguard is_ddl_relation(relation)
+           when elem(relation, 0) == @schema and elem(relation, 1) == @ddl_relation
+
+  def extract_ddl_version(
+        %{"txid" => _, "txts" => _, "version" => version, "query" => query} = row
+      ) do
+    {:ok, version, query}
+  end
 
   def current_schema(conn) do
     with {:ok, [_, _], rows} <- :epgsql.equery(conn, @current_schema_query) do
@@ -83,12 +105,6 @@ defmodule Electric.Postgres.Extension do
               {:ok, _cols, _rows} = :epgsql.squery(txconn, sql)
             end
 
-            # {:ok, _count} =
-            #   :epgsql.equery(
-            #     txconn,
-            #     "INSERT INTO #{@migration_table} (version) VALUES ($1)",
-            #     [version]
-            #   )
             {:ok, _count} =
               :epgsql.squery(
                 txconn,

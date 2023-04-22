@@ -1,6 +1,7 @@
 defmodule Electric.Satellite.Serialization do
-  alias Electric.Postgres.SchemaRegistry
+  alias Electric.Postgres.{Extension, Replication, Schema, SchemaRegistry}
   alias Electric.Replication.Changes
+  alias Electric.Replication.Postgres.ServerState
 
   alias Electric.Replication.Changes.{
     Transaction,
@@ -11,6 +12,10 @@ defmodule Electric.Satellite.Serialization do
 
   use Electric.Satellite.Protobuf
 
+  import Electric.Postgres.Extension, only: [is_migration_relation: 1, is_ddl_relation: 1]
+
+  require Logger
+
   @type relation_mapping() ::
           %{Changes.relation() => {PB.relation_id(), [SchemaRegistry.column_name()]}}
 
@@ -20,41 +25,104 @@ defmodule Electric.Satellite.Serialization do
   @spec serialize_trans(Transaction.t(), term(), relation_mapping()) ::
           {%SatOpLog{}, [Changes.relation()], relation_mapping()}
   def serialize_trans(%Transaction{} = trans, vx_offset, known_relations) do
-    tm =
-      trans.commit_timestamp
-      |> DateTime.to_unix(:millisecond)
-
+    tm = DateTime.to_unix(trans.commit_timestamp, :millisecond)
     lsn = :erlang.term_to_binary(vx_offset)
 
-    tx_begin = %SatTransOp{
-      op: {:begin, %SatOpBegin{commit_timestamp: tm, lsn: lsn, origin: trans.origin}}
+    tx_begin = %SatOpBegin{
+      commit_timestamp: tm,
+      lsn: lsn,
+      origin: trans.origin,
+      is_migration: false
     }
 
-    tx_end = %SatTransOp{
-      op: {:commit, %SatOpCommit{commit_timestamp: tm, lsn: lsn}}
+    state = %{
+      ops: [],
+      origin: trans.origin,
+      tx_begin: tx_begin,
+      migration_version: nil,
+      schema: nil,
+      new_relations: [],
+      known_relations: known_relations
     }
 
-    {ops, new_relations, known_relations} =
-      Enum.reduce(trans.changes, {[tx_begin], [], known_relations}, fn record,
-                                                                       {ops, new_relations,
-                                                                        known_relations1} ->
-        relation = record.relation
+    state = Enum.reduce(trans.changes, state, &serialize_change/2)
 
-        {rel_id, rel_cols, new_relations, known_relations1} =
-          case fetch_relation_id(relation, known_relations1) do
-            {:new, relation_id, columns, known_relations2} ->
-              {relation_id, columns, [relation | new_relations], known_relations2}
+    :ok = maybe_save_schema(trans.origin, state.migration_version, state.schema)
 
-            {:existing, relation_id, columns} ->
-              {relation_id, columns, new_relations, known_relations1}
-          end
+    begin_op = %SatTransOp{op: {:begin, state.tx_begin}}
+    commit_op = %SatTransOp{op: {:commit, %SatOpCommit{commit_timestamp: tm, lsn: lsn}}}
 
-        op = mk_trans_op(record, rel_id, rel_cols)
+    {
+      %SatOpLog{ops: [begin_op | Enum.reverse([commit_op | state.ops])]},
+      state.new_relations,
+      state.known_relations
+    }
+  end
 
-        {[op | ops], new_relations, known_relations1}
-      end)
+  defp serialize_change(record, state) when is_migration_relation(record.relation) do
+    %{
+      origin: origin,
+      ops: ops,
+      schema: schema,
+      migration_version: version,
+      tx_begin: tx_begin
+    } = state
 
-    {%SatOpLog{ops: Enum.reverse([tx_end | ops])}, new_relations, known_relations}
+    # lazily load the schema
+    schema = schema || ServerState.load!(origin)
+
+    state =
+      case(record) do
+        ddl when is_ddl_relation(ddl.relation) ->
+          {:ok, v, sql} = Extension.extract_ddl_version(ddl.record)
+
+          Logger.info("Applying migration #{inspect(v)}: #{inspect(sql)}")
+          # unlikely since the extension tables have constraints that prevent this
+          if version && version != v,
+            do:
+              raise(RuntimeError, message: "Got DDL transaction with differing migration versions")
+
+          {:ok, schema, op} = Replication.migrate(schema, v, sql)
+
+          %{
+            state
+            | ops: [%SatTransOp{op: {:migrate, op}} | ops],
+              migration_version: v,
+              schema: schema
+          }
+
+        _ ->
+          state
+      end
+
+    %{state | tx_begin: %{tx_begin | is_migration: true}}
+  end
+
+  defp serialize_change(record, state) do
+    %{ops: ops, new_relations: new_relations, known_relations: known_relations} = state
+
+    relation = record.relation
+
+    {rel_id, rel_cols, new_relations, known_relations} =
+      case fetch_relation_id(relation, known_relations) do
+        {:new, relation_id, columns, known} ->
+          {relation_id, columns, [relation | new_relations], known}
+
+        {:existing, relation_id, columns} ->
+          {relation_id, columns, new_relations, known_relations}
+      end
+
+    op = mk_trans_op(record, rel_id, rel_cols)
+
+    %{state | ops: [op | ops], new_relations: new_relations, known_relations: known_relations}
+  end
+
+  defp maybe_save_schema(_origin, nil, _schema) do
+    :ok
+  end
+
+  defp maybe_save_schema(origin, version, schema) do
+    ServerState.save(origin, version, schema)
   end
 
   defp mk_trans_op(%NewRecord{record: data, tags: tags}, rel_id, rel_cols) do

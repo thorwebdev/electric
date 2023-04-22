@@ -27,6 +27,10 @@ defmodule Electric.Replication.PostgresConnectorSup do
 
     children = [
       %{
+        id: :server_state,
+        start: {Postgres.ServerState, :start_link, [conn_config]}
+      },
+      %{
         id: :slot_server,
         start: {Postgres.SlotServer, :start_link, [conn_config, vaxine_producer]}
       },
