@@ -5,6 +5,8 @@ defmodule Electric.Postgres.Extension do
 
   alias Electric.Postgres.Schema.Proto
 
+  require Logger
+
   @type conn() :: :epgsql.connection()
   @type version() :: pos_integer()
   @type versions() :: [version()]
@@ -23,8 +25,10 @@ defmodule Electric.Postgres.Extension do
   @ddl_table ~s("#{@schema}"."#{@ddl_relation}")
   @schema_table ~s("#{@schema}"."schema")
 
-  @current_schema_query "SELECT schema, version FROM #{@schema_table} ORDER BY id DESC LIMIT 1"
-  @save_schema_query "INSERT INTO #{@schema_table} (version, schema) VALUES ($1, $2)"
+  @current_schema_query ~s(SELECT "schema", "version" FROM #{@schema_table} ORDER BY "id" DESC LIMIT 1)
+  # FIXME: VAX-600 insert into schema ignoring conflicts (which I think arise from inter-pg replication, a problem 
+  # that will go away once we stop replicating all tables by default)
+  @save_schema_query ~s[INSERT INTO #{@schema_table} ("version", "schema") VALUES ($1, $2) ON CONFLICT ("id") DO NOTHING]
   @ddl_history_query "SELECT id, txid, txts, query FROM #{@ddl_table} ORDER BY id ASC;"
 
   def schema, do: @schema
@@ -49,7 +53,7 @@ defmodule Electric.Postgres.Extension do
   end
 
   def current_schema(conn) do
-    with {:ok, [_, _], rows} <- :epgsql.equery(conn, @current_schema_query) do
+    with {:ok, [_, _], rows} <- :epgsql.equery(conn, @current_schema_query, []) do
       case rows do
         [] ->
           {:ok, nil}
@@ -65,7 +69,8 @@ defmodule Electric.Postgres.Extension do
   def save_schema(conn, version, %Proto.Schema{} = schema) do
     with {:ok, iodata} <- Proto.Schema.json_encode(schema),
          json = IO.iodata_to_binary(iodata),
-         {:ok, 1} <- :epgsql.equery(conn, @save_schema_query, [version, json]) do
+         {:ok, n} when n in [0, 1] <- :epgsql.equery(conn, @save_schema_query, [version, json]) do
+      Logger.info("Saved schema version #{version}")
       :ok
     end
   end
@@ -101,6 +106,8 @@ defmodule Electric.Postgres.Extension do
           migrations
           |> Enum.reject(fn {version, _module} -> version in existing_migrations end)
           |> Enum.reduce([], fn {version, module}, v ->
+            Logger.info("Running extension migration: #{version}")
+
             for sql <- module.up(@schema) do
               {:ok, _cols, _rows} = :epgsql.squery(txconn, sql)
             end
