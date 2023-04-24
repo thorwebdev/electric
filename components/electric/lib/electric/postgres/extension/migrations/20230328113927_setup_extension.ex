@@ -122,25 +122,27 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
       LANGUAGE PLPGSQL;
       """,
       ##################
-      """
-      CREATE OR REPLACE FUNCTION #{schema}.ddlx_command_start_handler()
-      RETURNS EVENT_TRIGGER AS $function$
-      DECLARE
-          _txid int8;
-          _txts timestamptz;
-          _version text;
-          trid int8;
-      BEGIN
-          SELECT v.txid, v.txts, v.version
-            INTO _txid, _txts, _version
-            FROM #{schema}.current_migration_version() v;
-
-          RAISE DEBUG 'command_start_handler:: version: % :: start', _version;
-          -- trid := (SELECT #{schema}.create_active_migration(_txid, _txts, _version));
-          RAISE DEBUG 'command_start_handler:: version: % :: end', _version;
-      END;
-      $function$ LANGUAGE PLPGSQL;
-      """,
+      # """
+      # CREATE OR REPLACE FUNCTION #{schema}.ddlx_command_start_handler()
+      # RETURNS EVENT_TRIGGER AS $function$
+      # DECLARE
+      #     _txid int8;
+      #     _txts timestamptz;
+      #     _version text;
+      #     trid int8;
+      # BEGIN
+      #     -- creating a version is now in the end_handler as we need the pg_event_trigger_ddl_commands() records
+      #     -- to filter ddl
+      #     -- SELECT v.txid, v.txts, v.version
+      #     --   INTO _txid, _txts, _version
+      #     --   FROM #{schema}.current_migration_version() v;
+      #
+      #     RAISE DEBUG 'command_start_handler:: version: % :: start', _version;
+      #     -- trid := (SELECT #{schema}.create_active_migration(_txid, _txts, _version));
+      #     RAISE DEBUG 'command_start_handler:: version: % :: end', _version;
+      # END;
+      # $function$ LANGUAGE PLPGSQL;
+      # """,
       ##################
       """
       CREATE OR REPLACE FUNCTION #{schema}.ddlx_command_end_handler() RETURNS EVENT_TRIGGER AS
@@ -180,10 +182,10 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
       LANGUAGE PLPGSQL;
       """,
       ##################
-      """
-      CREATE EVENT TRIGGER #{schema}_event_trigger_ddl_start ON ddl_command_start
-          EXECUTE FUNCTION #{schema}.ddlx_command_start_handler();
-      """,
+      # """
+      # CREATE EVENT TRIGGER #{schema}_event_trigger_ddl_start ON ddl_command_start
+      #     EXECUTE FUNCTION #{schema}.ddlx_command_start_handler();
+      # """,
       ##################
       """
       CREATE EVENT TRIGGER #{schema}_event_trigger_ddl_end ON ddl_command_end
