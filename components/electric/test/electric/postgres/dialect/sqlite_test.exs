@@ -446,6 +446,24 @@ defmodule Electric.Postgres.Dialect.SqliteTest do
              ALTER TABLE "i" ADD COLUMN "size" INTEGER DEFAULT 1;
              """
     end
+
+    # FIXME: VAX-600 we don't actually support serial pks, this test is here as an intermediate
+    # fix until we are more intelligent about only sending ddl for electrified tables
+    test "SERIAL primary keys", cxt do
+      sql = """
+      CREATE TABLE i (id SERIAL, k INTEGER DEFAULT '0' NOT NULL, PRIMARY KEY (id));
+      """
+
+      [sql1] = to_sqlite(sql, cxt)
+
+      assert sql1 == """
+             CREATE TABLE "i" (
+               "id" INTEGER NOT NULL,
+               "k" INTEGER DEFAULT '0' NOT NULL,
+               CONSTRAINT "i_pkey" PRIMARY KEY ("id")
+             ) WITHOUT ROWID;
+             """
+    end
   end
 
   describe "CREATE INDEX" do
