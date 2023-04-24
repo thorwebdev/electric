@@ -136,7 +136,7 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
             FROM #{schema}.current_migration_version() v;
 
           RAISE DEBUG 'command_start_handler:: version: % :: start', _version;
-          trid := (SELECT #{schema}.create_active_migration(_txid, _txts, _version));
+          -- trid := (SELECT #{schema}.create_active_migration(_txid, _txts, _version));
           RAISE DEBUG 'command_start_handler:: version: % :: end', _version;
       END;
       $function$ LANGUAGE PLPGSQL;
@@ -149,50 +149,31 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
           _txid int8;
           _txts timestamptz;
           _version text;
-          -- trid int8;
-          -- v_cmd_rec record;
-          -- do_insert_cmd boolean;
+          trid int8;
+          v_cmd_rec record;
+          _capture bool;
       BEGIN
-          SELECT txid, txts, version
-            INTO _txid, _txts, _version
-            FROM #{schema}.current_migration_version();
-          -- trid := (SELECT #{schema}.active_migration_id());
           RAISE DEBUG 'command_end_handler:: version: % :: start', _version;
-          -- FOR v_cmd_rec IN SELECT * FROM pg_event_trigger_ddl_commands()
-          -- LOOP
-          --   do_insert_cmd := true;
-          --   RAISE DEBUG 'command type %', v_cmd_rec.command_tag;
 
-          --   IF v_cmd_rec.command_tag = 'CREATE TABLE' THEN
-          --     RAISE DEBUG 'CREATE TABLE...';
-          --   ELSIF v_cmd_rec.command_tag = 'CREATE INDEX' THEN
-          --     RAISE DEBUG 'CREATE INDEX...';
-          --   ELSIF v_cmd_rec.command_tag = 'ALTER TABLE' THEN
-          --     IF EXISTS (SELECT 1 FROM pg_event_trigger_ddl_commands() WHERE objid = v_cmd_rec.objid AND command_tag = 'CREATE TABLE') THEN
-          --       -- the table being altered is also being created in the same transaction. so we can just ignore this
-          --       RAISE DEBUG 'CREATE + ALTER TABLE... %', v_cmd_rec.object_type;
-          --       do_insert_cmd := false;
-          --     ELSE
-          --       RAISE DEBUG 'ALTER TABLE... %', v_cmd_rec.object_type;
-          --     END IF;
-          --   END IF;
-          --   IF do_insert_cmd THEN
-          --       INSERT INTO #{"@ddl_tbl"} (trid, trig, classid, objid, objsubid, command_tag, object_type, schema_name, object_identity)
-          --       VALUES (
-          --           trid,
-          --           'e',
-          --           v_cmd_rec.classid,
-          --           v_cmd_rec.objid,
-          --           v_cmd_rec.objsubid,
-          --           v_cmd_rec.command_tag,
-          --           v_cmd_rec.object_type,
-          --           v_cmd_rec.schema_name,
-          --           -- ARRAY[v_cmd_rec.object_identity]
-          --           parse_ident(v_cmd_rec.object_identity)
-          --       );
-          --   END IF;
+          _capture := true;
 
-          -- END LOOP;
+          FOR v_cmd_rec IN SELECT * FROM pg_event_trigger_ddl_commands()
+          LOOP
+               RAISE INFO 'command type %', v_cmd_rec.command_tag;
+               -- think that black listing is easier than whitelisting atm
+               IF v_cmd_rec.command_tag IN ('CREATE PUBLICATION', 'ALTER PUBLICATION', 'CREATE SUBSCRIPTION', 'ALTER SUBSCRIPTION') THEN
+                 _capture := false;
+               END IF;
+          END LOOP;
+
+          IF _capture = true THEN
+            RAISE INFO 'capturing command';
+            SELECT v.txid, v.txts, v.version
+              INTO _txid, _txts, _version
+              FROM #{schema}.current_migration_version() v;
+            trid := (SELECT #{schema}.create_active_migration(_txid, _txts, _version));
+          END IF;
+
           RAISE DEBUG 'command_end_handler:: version: % :: end', _version;
       END;
       $function$

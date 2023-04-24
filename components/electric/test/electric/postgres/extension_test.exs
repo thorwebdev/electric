@@ -174,12 +174,35 @@ defmodule Electric.Postgres.ExtensionTest do
           {:ok, _cols, _rows} = :epgsql.squery(conn, sql)
         end
 
-        {:ok, [row1, row2, row3, row4]} = Extension.ddl_history(conn)
+        assert {:ok, [row1, row2, row3, row4]} = Extension.ddl_history(conn)
 
         assert {1, txid, timestamp, ^sql1} = row1
         assert {2, ^txid, ^timestamp, ^sql2} = row2
         assert {3, ^txid, ^timestamp, ^sql3} = row3
         assert {4, ^txid, ^timestamp, ^sql4} = row4
+      end,
+      cxt
+    )
+  end
+
+  test "logical replication ddl is not captured", cxt do
+    tx(
+      fn conn ->
+        {:ok, [2023_03_28_11_39_27]} = Extension.migrate(conn)
+
+        sql1 = "CREATE PUBLICATION all_tables FOR ALL TABLES;"
+
+        sql2 =
+          "CREATE SUBSCRIPTION \"postgres_1\" CONNECTION 'host=electric_1 port=5433 dbname=test connect_timeout=5000' PUBLICATION \"all_tables\" WITH (connect = false)"
+
+        sql3 = "ALTER SUBSCRIPTION \"postgres_1\" ENABLE"
+        # sql4 = "ALTER SUBSCRIPTION \"postgres_1\" REFRESH PUBLICATION WITH (copy_data = false);"
+
+        for sql <- [sql1, sql2, sql3] do
+          {:ok, _cols, _rows} = :epgsql.squery(conn, sql)
+        end
+
+        assert {:ok, []} = Extension.ddl_history(conn)
       end,
       cxt
     )
