@@ -122,7 +122,7 @@ defmodule Electric.Postgres.ExtensionTest do
   test "default migrations are valid", cxt do
     tx(
       fn conn ->
-        {:ok, [2023_03_28_11_39_27]} = Extension.migrate(conn)
+        {:ok, [2023_03_28_11_39_27, 2023_04_24_15_44_25]} = Extension.migrate(conn)
       end,
       cxt
     )
@@ -131,7 +131,7 @@ defmodule Electric.Postgres.ExtensionTest do
   test "we can retrieve and set the current schema json", cxt do
     tx(
       fn conn ->
-        {:ok, [2023_03_28_11_39_27]} = Extension.migrate(conn)
+        {:ok, [2023_03_28_11_39_27, 2023_04_24_15_44_25]} = Extension.migrate(conn)
 
         assert {:ok, nil} = Extension.current_schema(conn)
         schema = Schema.new()
@@ -163,7 +163,7 @@ defmodule Electric.Postgres.ExtensionTest do
   test "migration capture", cxt do
     tx(
       fn conn ->
-        {:ok, [2023_03_28_11_39_27]} = Extension.migrate(conn)
+        {:ok, [2023_03_28_11_39_27, 2023_04_24_15_44_25]} = Extension.migrate(conn)
 
         sql1 = "CREATE TABLE buttercup (id int8 GENERATED ALWAYS AS IDENTITY);"
         sql2 = "CREATE TABLE daisy (id int8 GENERATED ALWAYS AS IDENTITY);"
@@ -188,7 +188,7 @@ defmodule Electric.Postgres.ExtensionTest do
   test "logical replication ddl is not captured", cxt do
     tx(
       fn conn ->
-        {:ok, [2023_03_28_11_39_27]} = Extension.migrate(conn)
+        {:ok, [2023_03_28_11_39_27, 2023_04_24_15_44_25]} = Extension.migrate(conn)
 
         sql1 = "CREATE PUBLICATION all_tables FOR ALL TABLES;"
 
@@ -206,5 +206,56 @@ defmodule Electric.Postgres.ExtensionTest do
       end,
       cxt
     )
+  end
+
+  describe "electrification" do
+    alias Electric.Postgres.SQLGenerator
+
+    test "can generate the ddl to create any index"
+
+    test "can generate the ddl to create any table", cxt do
+      tx(
+        fn conn ->
+          assert {:ok, agent} = SQLGenerator.SchemaAgent.start_link()
+
+          {:ok, _} = Extension.migrate(conn)
+
+          SQLGenerator.sql_stream([:create_table],
+            schema: agent,
+            create_table: [
+              # again limit the types used to avoid differences around casting
+              # and representation that cause test failures but aren't problems
+              # with the extension code.
+              # To support other types, the sql_generator code would have to
+              # capture all of pg's rules around casting etc
+              types: [
+                {:int, "int4"},
+                {:int, "int2"},
+                {:int, "int8"}
+              ],
+              temporary_tables: false,
+              timezones: false,
+              serial: false
+            ]
+          )
+          |> Stream.take(40)
+          |> Enum.each(fn sql ->
+            assert {:ok, [], []} = :epgsql.squery(conn, sql)
+          end)
+
+          schema = SQLGenerator.SchemaAgent.schema(agent)
+
+          for table <- schema.tables do
+            {:ok, _cols, [{ddl}]} = Extension.create_table_ddl(conn, table.name)
+
+            ast = Electric.Postgres.parse!(ddl)
+            assert new_schema = Schema.update(Schema.new(), ast)
+            assert {:ok, new_table} = Schema.fetch_table(new_schema, table.name)
+            assert new_table == table
+          end
+        end,
+        cxt
+      )
+    end
   end
 end

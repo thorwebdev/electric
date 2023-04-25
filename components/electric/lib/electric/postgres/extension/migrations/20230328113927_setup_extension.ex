@@ -14,6 +14,7 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
     ddl_table = Extension.ddl_table()
     schema_table = Extension.schema_table()
     version_table = Extension.version_table()
+    event_triggers = Extension.event_triggers()
 
     [
       """
@@ -144,6 +145,10 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
                IF v_cmd_rec.command_tag IN ('CREATE PUBLICATION', 'ALTER PUBLICATION', 'CREATE SUBSCRIPTION', 'ALTER SUBSCRIPTION') THEN
                  _capture := false;
                END IF;
+               -- RAISE WARNING 'electric schema % // %', v_cmd_rec.schema_name, current_query();
+               -- IF v_cmd_rec.schema_name = '#{schema}' THEN
+               --   _capture := false;
+               -- END IF;
           END LOOP;
 
           IF _capture = true THEN
@@ -161,9 +166,8 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
       """,
       ##################
       """
-      CREATE EVENT TRIGGER #{schema}_event_trigger_ddl_end ON ddl_command_end
+      CREATE EVENT TRIGGER #{event_triggers[:ddl_command_end]} ON ddl_command_end
           EXECUTE FUNCTION #{schema}.ddlx_command_end_handler();
-
       """
     ]
   end
@@ -171,5 +175,9 @@ defmodule Electric.Postgres.Extension.Migrations.Migration_20230328113927 do
   @impl true
   def down(_schema) do
     []
+  end
+
+  def disable_event_triggers? do
+    false
   end
 end

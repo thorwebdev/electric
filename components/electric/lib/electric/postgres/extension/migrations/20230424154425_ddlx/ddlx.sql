@@ -3,15 +3,15 @@
 --  DDL eXtractor functions
 --  version 0.23 lacanoid@ljudmila.org
 --
----------------------------------------------------
+-- -------------------------------------------------
 
 SET client_min_messages = warning;
 
----------------------------------------------------
+-- -------------------------------------------------
 
----------------------------------------------------
+-- -------------------------------------------------
 --  Helpers for digesting system catalogs
----------------------------------------------------
+-- -------------------------------------------------
 
 CREATE OR REPLACE FUNCTION #schema#.ddlx_identify(
   IN oid,  
@@ -1865,7 +1865,7 @@ select depth+1,
  where r.ev_class is distinct from d.refobjid
    and not ( t.edges @> array[array[d.refobjid::int,d.objid::int]] )
 ),
-#schema#.ddlx_get_dependants_recursive as (
+ddlx_get_dependants_recursive as (
 select distinct 
        depth,
        classid,objid,objsubid,
