@@ -22,7 +22,6 @@ import {
 } from './database'
 import { MockDatabase, MockWebSQLDatabase } from './mock'
 import { MockSocketFactory } from '../../sockets/mock'
-import { MockConsoleClient } from '../../auth/mock'
 import { ElectricConfig } from '../../config'
 
 type RetVal<N extends Notifier, D extends Database = Database> = Promise<
@@ -60,7 +59,6 @@ export async function initTestable<N extends Notifier = MockNotifier>(
   const migrator = opts?.migrator || new MockMigrator()
   const notifier = (opts?.notifier as N) || new MockNotifier(dbName)
   const socketFactory = opts?.socketFactory || new MockSocketFactory()
-  const console = opts?.console || new MockConsoleClient()
   const registry = opts?.registry || new MockRegistry()
 
   const namespace = new ElectricNamespace(adapter, notifier)
@@ -80,7 +78,6 @@ export async function initTestable<N extends Notifier = MockNotifier>(
     migrator,
     notifier,
     socketFactory,
-    console,
     registry,
     config
   )

@@ -17,7 +17,6 @@ import { DatabaseAdapter } from './adapter'
 import { Database, ElectricDatabase, ElectrifiedDatabase } from './database'
 import { enablePromiseRuntime, MockDatabase } from './mock'
 import { MockSocketFactory } from '../../sockets/mock'
-import { MockConsoleClient } from '../../auth/mock'
 
 type RetVal<N extends Notifier> = Promise<[Database, N, ElectrifiedDatabase]>
 
@@ -36,7 +35,6 @@ export const initTestable = async <N extends Notifier = MockNotifier>(
   const migrator = opts?.migrator || new MockMigrator()
   const notifier = (opts?.notifier as N) || new MockNotifier(dbName)
   const socketFactory = opts?.socketFactory || new MockSocketFactory()
-  const console = opts?.console || new MockConsoleClient()
   const registry = opts?.registry || new MockRegistry()
 
   const namespace = new ElectricNamespace(adapter, notifier)
@@ -50,7 +48,6 @@ export const initTestable = async <N extends Notifier = MockNotifier>(
     migrator,
     notifier,
     socketFactory,
-    console,
     registry,
     config
   )

@@ -1,7 +1,6 @@
 import test from 'ava'
 
 import Database from 'better-sqlite3'
-import { MockConsoleClient } from '../../src/auth/mock'
 
 import { DatabaseAdapter } from '../../src/drivers/better-sqlite3/adapter'
 import { electrify } from '../../src/drivers/better-sqlite3/index'
@@ -16,14 +15,12 @@ const dbFilename = 'test.db'
 const getNewOpts = () => ({
   notifier: new MockNotifier(dbFilename),
   registry: new MockRegistry(),
-  console: new MockConsoleClient(),
 })
 
 test('electrify returns an equivalent database client', async (t) => {
   const original = new Database('test.db')
   const registry = new MockRegistry()
-  const console = new MockConsoleClient()
-  const db = await electrify(original, config, { registry, console })
+  const db = await electrify(original, config, { registry })
 
   const originalKeys = Object.getOwnPropertyNames(original)
   const originalPrototype = Object.getPrototypeOf(original)

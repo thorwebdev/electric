@@ -23,7 +23,6 @@ import {
   Statement,
 } from './database'
 import { MockSocketFactory } from '../../sockets/mock'
-import { MockConsoleClient } from '../../auth/mock'
 
 interface TestData {
   notifications: Notification[]
@@ -149,7 +148,6 @@ export class MockElectricWorker extends WorkerServer {
       const migrator = opts?.migrator || new MockMigrator()
       const notifier = opts?.notifier || new MockNotifier(dbName)
       const socketFactory = opts?.socketFactory || new MockSocketFactory()
-      const console = opts?.console || new MockConsoleClient()
 
       const namespace = new ElectricNamespace(adapter, notifier)
       this._dbs[dbName] = new ElectricDatabase(
@@ -164,7 +162,6 @@ export class MockElectricWorker extends WorkerServer {
         migrator,
         notifier,
         socketFactory,
-        console,
         config
       )
     } else {

@@ -4,7 +4,6 @@ import { ElectricConfig, hydrateConfig } from '../../config'
 import { ElectricNamespace, ElectrifyOptions } from '../../electric'
 import { EventNotifier } from '../../notifiers'
 import { WebSocketReactNativeFactory } from '../../sockets/react-native'
-import { ConsoleHttpClient } from '../../auth'
 import { globalRegistry } from '../../satellite'
 import { BundleMigrator } from '../../migrators'
 import { setLogLevel } from '../../util/debug'
@@ -26,7 +25,6 @@ export const start = async (
     opts?.migrator || new BundleMigrator(adapter, config.migrations)
   const notifier = opts?.notifier || new EventNotifier(dbName)
   const socketFactory = opts?.socketFactory || new WebSocketReactNativeFactory()
-  const console = opts?.console || new ConsoleHttpClient(configWithDefaults)
   const registry = opts?.registry || globalRegistry
 
   const namespace = new ElectricNamespace(adapter, notifier)
@@ -39,7 +37,6 @@ export const start = async (
     migrator,
     notifier,
     socketFactory,
-    console,
     configWithDefaults
   )
 

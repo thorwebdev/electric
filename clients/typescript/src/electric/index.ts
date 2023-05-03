@@ -7,7 +7,7 @@ import {
 import { DatabaseAdapter } from '../electric/adapter'
 import { Migrator } from '../migrators/index'
 import { Notifier } from '../notifiers/index'
-import { ConsoleClient, Registry } from '../satellite/index'
+import { Registry } from '../satellite/index'
 import { SocketFactory } from '../sockets/index'
 import { proxyOriginal } from '../proxy/original'
 import { DbName } from '../util/types'
@@ -21,7 +21,6 @@ export interface ElectrifyOptions {
   migrator?: Migrator
   notifier?: Notifier
   socketFactory?: SocketFactory
-  console?: ConsoleClient
   registry?: Registry
 }
 
@@ -66,7 +65,6 @@ export const electrify = async (
   migrator: Migrator,
   notifier: Notifier,
   socketFactory: SocketFactory,
-  console: ConsoleClient,
   registry: Registry,
   config: ElectricConfig
 ): Promise<AnyElectrifiedDatabase> => {
@@ -78,7 +76,6 @@ export const electrify = async (
     migrator,
     notifier,
     socketFactory,
-    console,
     config
   )
 

@@ -38,8 +38,6 @@ import uuid from 'react-native-uuid'
     : global
 )
 
-import { ConsoleHttpClient } from '../../auth'
-
 export { DatabaseAdapter, ElectricDatabase, ElectricWebSQLDatabase }
 export type { Database, ElectrifiedDatabase }
 
@@ -56,7 +54,6 @@ export const electrify = async <T extends Database>(
     opts?.migrator || new BundleMigrator(adapter, config.migrations)
   const notifier = opts?.notifier || new EventNotifier(dbName)
   const socketFactory = opts?.socketFactory || new WebSocketReactNativeFactory()
-  const console = opts?.console || new ConsoleHttpClient(configWithDefaults)
   const registry = opts?.registry || globalRegistry
 
   const namespace = new ElectricNamespace(adapter, notifier)
@@ -76,7 +73,6 @@ export const electrify = async <T extends Database>(
     migrator,
     notifier,
     socketFactory,
-    console,
     registry,
     configWithDefaults
   )

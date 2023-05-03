@@ -18,7 +18,6 @@ import { DbName } from '../../util/types'
 
 import { DatabaseAdapter } from './adapter'
 import { Database, ElectricDatabase, ElectrifiedDatabase } from './database'
-import { ConsoleHttpClient } from '../../auth'
 
 export { ElectricDatabase, DatabaseAdapter }
 export type { Database, ElectrifiedDatabase }
@@ -36,7 +35,6 @@ export const electrify = async <T extends Database>(
     opts?.migrator || new BundleMigrator(adapter, config.migrations)
   const notifier = opts?.notifier || new EventNotifier(dbName)
   const socketFactory = opts?.socketFactory || new WebSocketNodeFactory()
-  const console = opts?.console || new ConsoleHttpClient(configWithDefaults)
   const registry = opts?.registry || globalRegistry
 
   const namespace = new ElectricNamespace(adapter, notifier)
@@ -50,7 +48,6 @@ export const electrify = async <T extends Database>(
     migrator,
     notifier,
     socketFactory,
-    console,
     registry,
     configWithDefaults
   )

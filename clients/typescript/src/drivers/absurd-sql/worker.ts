@@ -15,7 +15,6 @@ import { ElectricDatabase } from './database'
 import { WasmLocator } from './locator'
 import { WebSocketWebFactory } from '../../sockets/web'
 import { setLogLevel } from '../../util/debug'
-import { ConsoleHttpClient } from '../../auth'
 
 // Avoid garbage collection.
 const refs = []
@@ -70,7 +69,6 @@ export class ElectricWorker extends WorkerServer {
         new BundleMigrator(adapter, configWithDefaults.migrations)
       const notifier = opts?.notifier || new WorkerBridgeNotifier(dbName, this)
       const socketFactory = opts?.socketFactory || new WebSocketWebFactory()
-      const console = opts?.console || new ConsoleHttpClient(configWithDefaults)
 
       const namespace = new ElectricNamespace(adapter, notifier)
       this._dbs[dbName] = new ElectricDatabase(
@@ -85,7 +83,6 @@ export class ElectricWorker extends WorkerServer {
         migrator,
         notifier,
         socketFactory,
-        console,
         configWithDefaults
       )
     } else {

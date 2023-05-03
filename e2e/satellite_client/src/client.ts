@@ -1,7 +1,5 @@
 import Database from 'better-sqlite3'
-import jwt from 'jsonwebtoken'
 import { ElectricConfig } from 'electric-sql'
-import { ConsoleClient, TokenRequest } from 'electric-sql/dist/satellite'
 
 import { setLogLevel } from 'electric-sql/debug'
 import { electrify, ElectrifiedDatabase } from 'electric-sql/node'
@@ -9,32 +7,6 @@ import * as fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 
 setLogLevel('DEBUG')
-
-// Console client throws an error when unable to fetch token which causes test to fail
-export class MockConsoleClient implements ConsoleClient {
-  token = async (request: TokenRequest) => {
-    const mockIss =
-      process.env.SATELLITE_AUTH_SIGNING_ISS || 'dev.electric-sql.com'
-    const mockKey =
-      process.env.SATELLITE_AUTH_SIGNING_KEY ||
-      'integration-tests-signing-key-example'
-
-    const iat = Math.floor(Date.now() / 1000) - 1000
-
-    const token = jwt.sign(
-      { user_id: request.clientId, type: 'access', iat },
-      mockKey,
-      {
-        issuer: mockIss,
-        algorithm: 'HS256',
-        expiresIn: '2h',
-      }
-    )
-
-    // Refresh token is not going to be used, so we don't mock it
-    return { token, refreshToken: '' }
-  }
-}
 
 export const read_migrations = (migration_file: string) => {
   const data = fs.readFileSync(migration_file)
@@ -62,9 +34,7 @@ export const open_db = (
     debug: true,
   }
   console.log(`config: ${JSON.stringify(config)}`)
-  return electrify(original, config, {
-    console: new MockConsoleClient(),
-  })
+  return electrify(original, config)
 }
 
 export const set_subscribers = (db: ElectrifiedDatabase) => {
